@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs } from '@remix-run/node';
-import { createSupabaseServerClient, createSupabaseServiceClient } from '~/lib/supabaseServer';
+import { createSupabaseServerClient } from '~/lib/supabaseServer';
 import { getSetting } from '~/lib/settings.server';
 import { parseGeneratedFiles, stripFileBlocks } from '~/lib/parser';
 import type { ChatMessage } from '~/lib/types';
@@ -228,9 +228,8 @@ export async function action({ request }: ActionFunctionArgs) {
           (estimatedInputTokensRef + estimatedOutputTokensRef) * tokenCostMultiplierRef
         );
 
-        // Deduct tokens via service role client
-        const serviceClient = createSupabaseServiceClient();
-        const { data: newBalance, error: deductError } = await serviceClient.rpc(
+        // Deduct tokens via the user's session client
+        const { data: newBalance, error: deductError } = await supabaseRef.rpc(
           'deduct_tokens',
           { p_user_id: userId, p_amount: actualTotalTokens }
         );
