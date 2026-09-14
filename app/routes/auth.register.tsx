@@ -72,6 +72,7 @@ export default function RegisterRoute() {
   const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
+  const initialPrompt = searchParams.get('prompt') || '';
   const emailRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -88,11 +89,15 @@ export default function RegisterRoute() {
 
     if (actionData?.success) {
       setMessage(actionData.message || 'Cuenta creada correctamente.');
+      const dest = actionData.redirectTo || redirectTo;
+      const loginUrl = initialPrompt
+        ? `/auth/login?redirectTo=${encodeURIComponent(dest)}&prompt=${encodeURIComponent(initialPrompt)}`
+        : `/auth/login?redirectTo=${encodeURIComponent(dest)}`;
       setTimeout(() => {
-        window.location.href = `/auth/login?redirectTo=${encodeURIComponent(actionData.redirectTo || redirectTo)}`;
+        window.location.href = loginUrl;
       }, 2000);
     }
-  }, [actionData, redirectTo]);
+  }, [actionData, redirectTo, initialPrompt]);
 
   return (
     <div className="min-h-screen bg-[#171717] flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden">
@@ -112,6 +117,12 @@ export default function RegisterRoute() {
           </Link>
           <h1 className="mt-6 text-3xl font-bold text-white tracking-tight">Crea tu cuenta</h1>
           <p className="mt-2 text-sm text-[#A3A3A3]">Comienza a construir con IA en minutos</p>
+          {initialPrompt && (
+            <div className="mt-4 rounded-xl border border-[#9E7FFF]/30 bg-[#9E7FFF]/10 px-4 py-3 text-left">
+              <p className="text-xs font-medium text-[#9E7FFF] mb-1">Tu idea:</p>
+              <p className="text-sm text-white/80 line-clamp-3">{initialPrompt}</p>
+            </div>
+          )}
         </div>
 
         <div className="bg-[#262626] rounded-2xl p-8 shadow-xl ring-1 ring-[#2F2F2F]">

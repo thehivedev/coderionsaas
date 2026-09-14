@@ -62,6 +62,7 @@ export default function LoginRoute() {
   const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
+  const initialPrompt = searchParams.get('prompt') || '';
   const emailRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -75,9 +76,12 @@ export default function LoginRoute() {
     }
 
     if (actionData?.success) {
-      window.location.href = actionData.redirectTo || redirectTo;
+      const dest = actionData.redirectTo || redirectTo;
+      window.location.href = initialPrompt
+        ? `${dest}${dest.includes('?') ? '&' : '?'}prompt=${encodeURIComponent(initialPrompt)}`
+        : dest;
     }
-  }, [actionData, redirectTo]);
+  }, [actionData, redirectTo, initialPrompt]);
 
   return (
     <div className="min-h-screen bg-[#171717] flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden">

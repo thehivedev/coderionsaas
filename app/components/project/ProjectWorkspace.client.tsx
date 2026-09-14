@@ -12,6 +12,7 @@ interface ProjectWorkspaceProps {
   initialMessages: ChatMessage[];
   initialFiles: ProjectFile[];
   models: AIModel[];
+  initialPrompt?: string;
 }
 
 type PanelView = 'editor' | 'preview' | 'split';
@@ -22,6 +23,7 @@ export default function ProjectWorkspace({
   initialMessages,
   initialFiles,
   models,
+  initialPrompt,
 }: ProjectWorkspaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages || []);
   const [files, setFiles] = useState<ProjectFile[]>(initialFiles || []);
@@ -47,6 +49,16 @@ export default function ProjectWorkspace({
       setSelectedFile(files[0]);
     }
   }, [files, selectedFile]);
+
+  useEffect(() => {
+    if (initialPrompt && initialPrompt.trim() && messages.length === 0 && !isSending) {
+      setInput(initialPrompt);
+      const timer = setTimeout(() => {
+        handleSendMessage();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [initialPrompt]);
 
   const refreshFiles = useCallback(async () => {
     const freshFiles = await getProjectFiles(projectId);

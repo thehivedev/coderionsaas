@@ -1,5 +1,5 @@
 import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
-import { useLoaderData } from '@remix-run/react';
+import { useLoaderData, useSearchParams } from '@remix-run/react';
 import { createSupabaseServerClient } from '~/lib/supabaseServer';
 import { APP_NAME } from '~/lib/constants';
 import type { AIModel, ProjectFile } from '~/lib/types';
@@ -76,6 +76,8 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 }
 
 export default function ProjectRoute() {
+  const [searchParams] = useSearchParams();
+  const initialPrompt = searchParams.get('prompt') || '';
   const { user, profile, project, files, models } = useLoaderData<{
     user: { id: string; email: string };
     profile: {
@@ -109,6 +111,7 @@ export default function ProjectRoute() {
           initialMessages={project.messages}
           initialFiles={files}
           models={models}
+          initialPrompt={initialPrompt}
         />
       </main>
     </div>

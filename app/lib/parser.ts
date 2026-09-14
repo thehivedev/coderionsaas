@@ -27,23 +27,13 @@ function detectLanguage(path: string): string {
 function extractPath(line: string): string | null {
   const trimmed = line.trim();
 
-  const patterns = [
-    /(?:^|\s)(?:filepath|file|path)[:=]\s*[`"']?(.+?)[`"']?\s*$/i,
-    [3, 4],
-    /```(?:[a-zA-Z]+)?\s*\n?\s*(?:\/\/\s*)?(?:filepath|file|path)[:=]\s*[`"']?(.+?)[`"']?\s*$/i,
-  ];
+  // Pattern: filepath:src/App.tsx  OR  file:src/App.tsx  OR  path:src/App.tsx
+  const directMatch = trimmed.match(/^(?:filepath|file|path)[:=]\s*[`"']?(.+?)[`"']?\s*$/i);
+  if (directMatch) return directMatch[1].replace(/[`"']/g, '').trim();
 
-  for (const pattern of patterns) {
-    const match = trimmed.match(pattern as RegExp);
-    if (match && match[1]) {
-      return match[1].replace(/[`"']/g, '').trim();
-    }
-  }
-
-  const filepathMatch = trimmed.match(/(?:\/\/|#|<!--)\s*(?:filepath|file|path)[:=]\s*(.+?)\s*(?:-->|$)/i);
-  if (filepathMatch && filepathMatch[1]) {
-    return filepathMatch[1].replace(/[`"']/g, '').trim();
-  }
+  // Pattern: // filepath:src/App.tsx  OR  # filepath:src/App.tsx
+  const commentMatch = trimmed.match(/(?:\/\/|#|<!--)\s*(?:filepath|file|path)[:=]\s*(.+?)\s*(?:-->|$)/i);
+  if (commentMatch) return commentMatch[1].replace(/[`"']/g, '').trim();
 
   return null;
 }
@@ -56,71 +46,64 @@ export function parseGeneratedFiles(response: string): ParsedFile[] {
   while (i < lines.length) {
     const line = lines[i];
 
-    if (line.trim().startsWith('```')) {
-      let path: string | null = null;
-      let language = '';
-
-      const fenceMatch = line.match(/^```(\w*)/);
-      if (fenceMatch) {
-        language = fenceMatch[1] || '';
-      }
-
-      let checkIdx = i + 1;
-      if (checkIdx < lines.length) {
-        const pathFromNext = extractPath(lines[checkIdx]);
-        if (pathFromNext) {
-          path = pathFromNext;
-          checkIdx++;
-        }
-      }
-
-      if (!path) {
-        const pathFromFence = extractPath(line);
-        if (pathFromNext) {
-          path = pathFromFence;
-        }
-      }
-
-      if (!path) {
-        const inlinePath = line.match(/```(?:\w+)?\s+(.+)/);
-        if (inlinePath && inlinePath[1]) {
-          const candidate = inlinePath[1].replace(/[`"']/g, '').trim();
-          if (candidate.includes('/') || candidate.includes('.') || candidate.includes('\\')) {
-            path = candidate;
-          }
-        }
-      }
-
-      if (!path) {
-        i++;
-        continue;
-      }
-
-      const contentLines: string[] = [];
-      let foundClose = false;
-      for (let j = checkIdx; j < lines.length; j++) {
-        if (lines[j].trim() === '```') {
-          foundClose = true;
-          i = j + 1;
-          break;
-        }
-        contentLines.push(lines[j]);
-      }
-
-      if (!foundClose) {
-        i++;
-        continue;
-      }
-
-      let content = contentLines.join('\n');
-      content = content.replace(/^\n+/, '').replace(/\s+$/, '');
-
-      const detectedLang = language || detectLanguage(path);
-
-      files.push({ path, content, language: detectedLang });
-    } else {
+    if (!line.trim().startsWith('```')) {
       i++;
+      continue;
     }
+
+    // Try to extract path from the fence line itself:
+    // ```tsx filepath:src/App.tsx
+    const fenceMatch = line.match(/^```(\w*)\s+(.*)/);
+    let path: string | null = null;
+    let language = '';
+    let contentStartIdx = i + 1;
+
+    if (fenceMatch) {
+      language = fenceMatch[1] || '';
+      const afterLang = fenceMatch[2].trim();
+      const pathFromFence = extractPath(afterLang);
+      if (pathFromFence) {
+        path = pathFromFence;
+      }
+    }
+
+    // If no path on fence line, check the next line for a filepath comment
+    if (!path && contentStartIdx < lines.length) {
+      const pathFromNext = extractPath(lines[contentStartIdx]);
+      if (pathFromNext) {
+        path = pathFromNext;
+        contentStartIdx++;
+      }
+    }
+
+    if (!path) {
+      i++;
+      continue;
+    }
+
+    // Collect content until closing fence
+    const contentLines: string[] = [];
+    let foundClose = false;
+    for (let j = contentStartIdx; j < lines.length; j++) {
+      if (lines[j].trim() === '```') {
+        foundClose = true;
+        i = j + 1;
+        break;
+      }
+      contentLines.push(lines[j]);
+    }
+
+    if (!foundClose) {
+      i++;
+      continue;
+    }
+
+    let content = contentLines.join('\n');
+    content = content.replace(/^\n+/, '').replace(/\s+$/, '');
+
+    const detectedLang = language || detectLanguage(path);
+
+    files.push({ path, content, language: detectedLang });
   }
 
   return files;
@@ -131,15 +114,18 @@ export function stripFileBlocks(response: string): string {
   let cleaned = response;
 
   for (const file of files) {
+    // Escape regex special chars in path
+    const escapedPath = file.path.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    // Match the full block: ```lang filepath:path ... content ... ```
     const blockRegex = new RegExp(
-      '```[a-zA-Z]*\\s*(?://\\s*)?(?:filepath|file|path)[:=]\\s*[^\\n]+\\n[\\s\\S]*?```\\n?',
+      '```\\w*\\s*(?://\\s*)?(?:filepath|file|path)[:=]\\s*' +
+        escapedPath +
+        '[^\\n]*\\n[\\s\\S]*?```\\n?',
       'g'
     );
     cleaned = cleaned.replace(blockRegex, '');
   }
-
-  const genericBlockRegex = /```[a-zA-Z]+\s+\S[\s\S]*?```\n?/g;
-  cleaned = cleaned.replace(genericBlockRegex, '');
 
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
 

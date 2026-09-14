@@ -1,6 +1,6 @@
 import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
-import { Link, useLoaderData, useNavigate } from '@remix-run/react';
-import { useState } from 'react';
+import { Link, useLoaderData, useNavigate, useSearchParams } from '@remix-run/react';
+import { useState, useEffect } from 'react';
 import { createSupabaseServerClient } from '~/lib/supabaseServer';
 import { APP_NAME, APP_VERSION } from '~/lib/constants';
 import type { AIModel, Project, Profile } from '~/lib/types';
@@ -259,15 +259,28 @@ function PublicLanding() {
 
 function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [isCreating, setIsCreating] = useState(false);
+  const initialPrompt = searchParams.get('prompt') || '';
 
-  async function handleNewProject() {
+  async function handleNewProject(prompt?: string) {
     if (isCreating) return;
     setIsCreating(true);
     const project = await createProject(data.user.id);
-    if (project) navigate(`/project/${project.id}`);
+    if (project) {
+      const dest = prompt
+        ? `/project/${project.id}?prompt=${encodeURIComponent(prompt)}`
+        : `/project/${project.id}`;
+      navigate(dest);
+    }
     setIsCreating(false);
   }
+
+  useEffect(() => {
+    if (initialPrompt) {
+      handleNewProject(initialPrompt);
+    }
+  }, []);
 
   return (
     <div className="flex h-screen bg-[#171717]">
@@ -280,7 +293,7 @@ function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
             </div>
             <h1 className="mb-4 text-4xl font-bold tracking-tight text-white sm:text-5xl">Coderion</h1>
             <p className="mb-8 text-lg text-[#A3A3A3]">Describe un proyecto web y la IA genera todos los archivos por ti.</p>
-            <button onClick={handleNewProject} disabled={isCreating} className="inline-flex items-center gap-2 rounded-xl bg-[#9E7FFF] px-6 py-3 font-semibold text-white transition-all hover:bg-[#8B6EE6] disabled:opacity-50">
+            <button onClick={() => handleNewProject()} disabled={isCreating} className="inline-flex items-center gap-2 rounded-xl bg-[#9E7FFF] px-6 py-3 font-semibold text-white transition-all hover:bg-[#8B6EE6] disabled:opacity-50">
               {isCreating ? 'Creando...' : 'Crear nuevo proyecto'}
               {!isCreating && <ArrowIcon />}
             </button>
