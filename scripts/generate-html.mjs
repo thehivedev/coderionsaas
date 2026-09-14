@@ -3,11 +3,12 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const buildClientDir = path.join(__dirname, '..', 'build', 'client');
 const distDir = path.join(__dirname, '..', 'dist');
 
-const assetsDir = path.join(distDir, 'assets');
+const assetsDir = path.join(buildClientDir, 'assets');
 if (!fs.existsSync(assetsDir)) {
-  console.error('No assets directory found in dist/');
+  console.error('No assets directory found in build/client/');
   process.exit(1);
 }
 
