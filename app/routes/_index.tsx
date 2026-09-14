@@ -106,6 +106,7 @@ function GitHubIcon() {
 function PublicLanding() {
   const [prompt, setPrompt] = useState('');
   const [activeStarter, setActiveStarter] = useState('Website');
+  const [showSignup, setShowSignup] = useState(false);
   const starters = [
     { label: 'Website', icon: <GlobeIcon /> },
     { label: 'Slides', icon: <SlidesIcon />, badge: 'New' },
@@ -140,7 +141,7 @@ function PublicLanding() {
         <h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em] text-white sm:text-[34px]">What will you build today?</h1>
         <p className="mt-3 text-[12px] text-white/80 sm:text-[13px]">Create stunning apps &amp; websites by chatting with AI.</p>
 
-        <form action="/auth/register" method="get" className="mt-5 w-full max-w-[380px] rounded-[15px] border border-white/[0.08] bg-[#1b1b1d] p-2.5 text-left shadow-[0_18px_55px_rgba(0,0,0,0.35)] transition-all focus-within:border-white/20 focus-within:shadow-[0_18px_65px_rgba(0,100,255,0.2)] sm:max-w-[380px]">
+        <form onSubmit={(event) => { event.preventDefault(); setShowSignup(true); }} className="mt-5 w-full max-w-[380px] rounded-[15px] border border-white/[0.08] bg-[#1b1b1d] p-2.5 text-left shadow-[0_18px_55px_rgba(0,0,0,0.35)] transition-all focus-within:border-white/20 focus-within:shadow-[0_18px_65px_rgba(0,100,255,0.2)] sm:max-w-[380px]">
           <textarea name="prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={2} placeholder="Let's build a" className="h-[35px] w-full resize-none bg-transparent px-1.5 py-0.5 text-[11px] leading-5 text-white outline-none placeholder:text-white/35" />
           <div className="mt-2 flex items-center justify-between">
             <button type="button" aria-label="Add context" className="flex h-6 w-6 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/10 hover:text-white"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}><path strokeLinecap="round" d="M12 5v14M5 12h14" /></svg></button>
@@ -168,6 +169,23 @@ function PublicLanding() {
           <Link to="/auth/register" className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><span className="font-semibold">Team template</span> <ArrowIcon /></Link>
         </div>
       </main>
+
+      {showSignup && (
+        <div className="fixed inset-0 z-30 flex items-center justify-center bg-black/60 px-4 backdrop-blur-[2px]" role="dialog" aria-modal="true" aria-labelledby="signup-title">
+          <div className="relative w-full max-w-[315px] rounded-[7px] border border-white/[0.08] bg-[#151517] px-8 pb-8 pt-7 text-center shadow-[0_24px_80px_rgba(0,0,0,0.65)] sm:max-w-[325px]">
+            <button type="button" onClick={() => setShowSignup(false)} aria-label="Close sign up dialog" className="absolute right-3 top-3 flex h-5 w-5 items-center justify-center rounded text-white/55 transition-colors hover:bg-white/10 hover:text-white"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" d="m6 6 12 12M18 6 6 18" /></svg></button>
+            <div className="mx-auto flex w-fit items-center gap-1.5 text-white"><span className="flex h-6 w-6 items-center justify-center rounded bg-white text-[#151517]"><BoltMark /></span><span className="text-[21px] font-bold italic tracking-[-0.08em]">{APP_NAME}</span></div>
+            <h2 id="signup-title" className="mt-6 text-[11px] font-medium text-white/85">Create a new account using one of the options below</h2>
+            <div className="mt-4 space-y-2">
+              <Link to="/auth/register" onClick={() => setShowSignup(false)} className="relative flex h-7 w-full items-center justify-center rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]"><svg className="absolute left-3 h-3 w-3" viewBox="0 0 24 24"><path fill="currentColor" d="M21.8 12.2c0-.7-.1-1.3-.2-1.9H12v3.6h5.5a4.7 4.7 0 0 1-2 3.1v2.6h3.2c1.9-1.8 3.1-4.4 3.1-7.4Z" /><path fill="currentColor" d="M12 22c2.7 0 5-.9 6.7-2.4l-3.2-2.6c-.9.6-2 .9-3.5.9-2.7 0-5-1.8-5.8-4.3H2.9v2.7A10.1 10.1 0 0 0 12 22Z" /><path fill="currentColor" d="M6.2 13.6a6 6 0 0 1 0-3.2V7.7H2.9a10.1 10.1 0 0 0 0 8.6l3.3-2.7Z" /><path fill="currentColor" d="M12 6.1c1.5 0 2.8.5 3.8 1.5l2.9-2.9C17 3.1 14.7 2 12 2a10.1 10.1 0 0 0-9.1 5.7l3.3 2.7C7 7.9 9.3 6.1 12 6.1Z" /></svg>Sign up with Google<span className="absolute right-2 rounded bg-white/[0.08] px-1.5 py-0.5 text-[7px] text-white/55">Last used</span></Link>
+              <Link to="/auth/register" onClick={() => setShowSignup(false)} className="relative flex h-7 w-full items-center justify-center gap-1.5 rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]"><GitHubIcon />Sign up with GitHub</Link>
+              <Link to="/auth/register" onClick={() => setShowSignup(false)} className="flex h-7 w-full items-center justify-center rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]">Sign up with email and password</Link>
+              <Link to="/auth/register" onClick={() => setShowSignup(false)} className="flex h-7 w-full items-center justify-center rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]">Sign up with SSO</Link>
+            </div>
+            <p className="mt-4 text-[8px] leading-3 text-white/45">By signing up, you accept the <a href="#terms" className="underline underline-offset-2">Terms of Service</a> and<br /> acknowledge our <a href="#privacy" className="underline underline-offset-2">Privacy Policy</a>.</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
