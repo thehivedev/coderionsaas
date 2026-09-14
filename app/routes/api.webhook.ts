@@ -1,6 +1,15 @@
 import type { ActionFunctionArgs } from '@remix-run/node';
-import { stripe, STRIPE_WEBHOOK_SECRET, TOKEN_PACKAGES } from '~/lib/stripe.server';
+import Stripe from 'stripe';
 import { createSupabaseServiceClient } from '~/lib/supabaseServer';
+import { getSetting } from '~/lib/settings.server';
+
+const TOKEN_PACKAGES = {
+  basic: { tokens: 500_000, settingKey: 'stripe_price_basic' },
+  pro: { tokens: 2_000_000, settingKey: 'stripe_price_pro' },
+  enterprise: { tokens: 10_000_000, settingKey: 'stripe_price_enterprise' },
+} as const;
+
+type TokenPackageKey = keyof typeof TOKEN_PACKAGES;
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
@@ -8,23 +17,33 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const signature = request.headers.get('stripe-signature');
-
   if (!signature) {
     return new Response('Missing stripe-signature header', { status: 400 });
   }
 
-  let event;
+  const stripeSecretKey = await getSetting('stripe_secret_key');
+  const webhookSecret = await getSetting('stripe_webhook_secret');
 
+  if (!stripeSecretKey || !webhookSecret) {
+    return new Response('Stripe not configured', { status: 503 });
+  }
+
+  const stripeClient = new Stripe(stripeSecretKey, {
+    apiVersion: '2025-02-24.acacia',
+    typescript: true,
+  });
+
+  let event: Stripe.Event;
   try {
     const payload = await request.text();
-    event = stripe.webhooks.constructEvent(payload, signature, STRIPE_WEBHOOK_SECRET);
+    event = stripeClient.webhooks.constructEvent(payload, signature, webhookSecret);
   } catch (err) {
     console.error('Webhook signature verification failed:', err);
     return new Response('Invalid signature', { status: 400 });
   }
 
   if (event.type === 'checkout.session.completed') {
-    const session = event.data.object;
+    const session = event.data.object as Stripe.Checkout.Session;
     const customerEmail = session.customer_email || session.customer_details?.email;
 
     if (!customerEmail) {
@@ -32,20 +51,19 @@ export async function action({ request }: ActionFunctionArgs) {
       return new Response('No email found', { status: 400 });
     }
 
-    // Retrieve the full session with line items expanded
-    const expandedSession = await stripe.checkout.sessions.retrieve(
+    const expandedSession = await stripeClient.checkout.sessions.retrieve(
       session.id,
       { expand: ['line_items'] }
     );
 
     const lineItems = expandedSession.line_items?.data || [];
-
     let tokensToAdd = 0;
 
     for (const item of lineItems) {
       const priceId = item.price?.id || '';
-      for (const key of Object.keys(TOKEN_PACKAGES) as Array<keyof typeof TOKEN_PACKAGES>) {
-        if (TOKEN_PACKAGES[key].priceId === priceId) {
+      for (const key of Object.keys(TOKEN_PACKAGES) as TokenPackageKey[]) {
+        const pkgPriceId = await getSetting(TOKEN_PACKAGES[key].settingKey);
+        if (pkgPriceId && pkgPriceId === priceId) {
           tokensToAdd += TOKEN_PACKAGES[key].tokens * (item.quantity || 1);
           break;
         }
@@ -57,7 +75,6 @@ export async function action({ request }: ActionFunctionArgs) {
       return new Response('Unknown price', { status: 400 });
     }
 
-    // Use service role client to bypass RLS for webhook
     const supabase = createSupabaseServiceClient();
 
     const { data: userData, error: userError } = await supabase

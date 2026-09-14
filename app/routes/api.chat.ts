@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from '@remix-run/node';
 import { createSupabaseServerClient, createSupabaseServiceClient } from '~/lib/supabaseServer';
+import { getSetting } from '~/lib/settings.server';
 import { parseGeneratedFiles, stripFileBlocks } from '~/lib/parser';
 import type { ChatMessage } from '~/lib/types';
 
@@ -117,10 +118,10 @@ export async function action({ request }: ActionFunctionArgs) {
   // Save the selected model on the project
   await supabase.from('projects').update({ model_id: apiModel }).eq('id', projectId);
 
-  const apiKey = process.env.OPENROUTER_API_KEY;
-  if (!apiKey || apiKey === 'sk-or-v1-your-openrouter-api-key-here') {
+  const apiKey = await getSetting('openrouter_api_key');
+  if (!apiKey) {
     return Response.json(
-      { error: 'El servicio de IA no esta configurado. Falta OPENROUTER_API_KEY.' },
+      { error: 'El servicio de IA no esta configurado. Configura la API key de OpenRouter en el panel de administración.' },
       { status: 503, headers }
     );
   }

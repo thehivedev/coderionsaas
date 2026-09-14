@@ -1,5 +1,6 @@
 import type { ActionFunctionArgs } from '@remix-run/node';
 import { createSupabaseServerClient, createSupabaseServiceClient } from '~/lib/supabaseServer';
+import { getSetting } from '~/lib/settings.server';
 
 const GITHUB_OAUTH_AUTHORIZE = 'https://github.com/login/oauth/authorize';
 const GITHUB_OAUTH_TOKEN = 'https://github.com/login/oauth/access_token';
@@ -26,10 +27,10 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({ error: 'No autenticado' }, { status: 401, headers });
   }
 
-  const clientId = process.env.GITHUB_CLIENT_ID;
+  const clientId = await getSetting('github_client_id');
   if (!clientId) {
     return Response.json(
-      { error: 'GitHub OAuth no esta configurado.' },
+      { error: 'GitHub OAuth no esta configurado. Configura las credenciales en el panel de administración.' },
       { status: 503, headers }
     );
   }
@@ -68,8 +69,8 @@ export async function loader({ request }: ActionFunctionArgs) {
     });
   }
 
-  const clientId = process.env.GITHUB_CLIENT_ID;
-  const clientSecret = process.env.GITHUB_CLIENT_SECRET;
+  const clientId = await getSetting('github_client_id');
+  const clientSecret = await getSetting('github_client_secret');
 
   if (!clientId || !clientSecret) {
     return new Response(null, {
