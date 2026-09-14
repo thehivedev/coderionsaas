@@ -203,18 +203,30 @@ function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isCreating, setIsCreating] = useState(false);
+  const [prompt, setPrompt] = useState('');
+  const [activeStarter, setActiveStarter] = useState('Website');
+  const [selectedStarter, setSelectedStarter] = useState<string | null>(null);
+  const [planMode, setPlanMode] = useState(false);
   const initialPrompt = searchParams.get('prompt') || '';
   const projectType = searchParams.get('type') || '';
-  const planMode = searchParams.get('plan') === 'true';
+  const urlPlanMode = searchParams.get('plan') === 'true';
+  const starterToType: Record<string, string> = { Website: 'react-web', Slides: 'slides', App: 'expo', Prototype: 'prototype' };
+  const starters = [
+    { label: 'Website', icon: <GlobeIcon /> },
+    { label: 'Slides', icon: <SlidesIcon />, badge: 'New' },
+    { label: 'App', icon: <AppIcon /> },
+    { label: 'Prototype', icon: <FlaskIcon /> },
+  ];
+  const selectedStarterItem = starters.find((s) => s.label === selectedStarter);
 
-  async function handleNewProject(prompt?: string, source?: string) {
+  async function handleNewProject(promptText?: string, source?: string) {
     if (isCreating) return;
     setIsCreating(true);
-    const project = await createProject(data.user.id, projectType || undefined);
+    const project = await createProject(data.user.id, projectType || (selectedStarter ? starterToType[selectedStarter] : undefined));
     if (project) {
       const params = new URLSearchParams();
-      if (prompt) params.set('prompt', prompt);
-      if (planMode) params.set('plan', 'true');
+      if (promptText) params.set('prompt', promptText);
+      if (planMode || urlPlanMode) params.set('plan', 'true');
       if (source) params.set('source', source);
       navigate(`/project/${project.id}${params.toString() ? `?${params.toString()}` : ''}`);
     }
@@ -235,18 +247,32 @@ function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
         <main className="relative z-10 flex min-h-screen flex-col items-center px-5 pt-[24vh] text-center sm:pt-[26vh]">
           <h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em] text-white sm:text-[34px]">What will you build today?</h1>
           <p className="mt-3 text-[12px] text-white/80 sm:text-[13px]">Create stunning apps &amp; websites by chatting with AI.</p>
-          <form onSubmit={(event) => { event.preventDefault(); handleNewProject(prompt); }} className={`mt-5 w-full max-w-[380px] rounded-[15px] border p-2.5 text-left shadow-[0_18px_55px_rgba(0,0,0,0.35)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-white/20 focus-within:shadow-[0_18px_65px_rgba(0,100,255,0.2)] sm:max-w-[380px] ${planMode ? 'border-[#3b8ac0]/50 bg-[#1d2024]' : 'border-white/[0.08] bg-[#1b1b1d]'}`}>
-            <textarea name="prompt" rows={2} placeholder="Let's build a" className="h-[35px] w-full resize-none bg-transparent px-1.5 py-0.5 text-[11px] leading-5 text-white outline-none placeholder:text-white/35" />
+          <form onSubmit={(event) => { event.preventDefault(); handleNewProject(prompt); }} className={`mt-5 w-full max-w-[380px] rounded-[15px] border p-2.5 text-left shadow-[0_18px_55px_rgba(0,0,0,0.35)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-white/20 focus-within:shadow-[0_18px_65px_rgba(0,100,255,0.2)] sm:max-w-[380px] ${(planMode || urlPlanMode) ? 'border-[#3b8ac0]/50 bg-[#1d2024]' : 'border-white/[0.08] bg-[#1b1b1d]'}`}>
+            <textarea name="prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={2} placeholder="Let's build a" className="h-[35px] w-full resize-none bg-transparent px-1.5 py-0.5 text-[11px] leading-5 text-white outline-none placeholder:text-white/35" />
             <div className="mt-2 flex items-center justify-between">
               <div className="flex min-w-0 items-center gap-1.5">
                 <button type="button" aria-label="Add context" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/10 hover:text-white"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}><path strokeLinecap="round" d="M12 5v14M5 12h14" /></svg></button>
+                {selectedStarterItem && <span className="inline-flex max-w-[110px] items-center gap-1 rounded-full border border-[#2d75a5]/60 bg-[#123b59] px-1.5 py-1 text-[9px] font-medium text-[#9edbff]">
+                  <span className="shrink-0 text-[#65c5ff]">{selectedStarterItem.icon}</span>
+                  <span className="truncate">{selectedStarterItem.label}</span>
+                  <button type="button" onClick={() => setSelectedStarter(null)} aria-label={`Remove ${selectedStarterItem.label} flag`} className="ml-0.5 text-[#86b9d6] transition-colors hover:text-white">×</button>
+                </span>}
               </div>
               <div className="flex items-center gap-2.5">
-                <button type="button" onClick={() => {}} className={`group flex items-center gap-1 rounded-full px-3 py-1.5 text-[10px] font-semibold transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${planMode ? 'bg-[#21415c] text-[#b8e4ff] shadow-[0_0_0_1px_rgba(88,180,239,0.22)]' : 'bg-[#1c3950] text-white/80 hover:bg-[#285879]'}`}><svg className="h-3 w-3 transition-transform duration-500 group-hover:rotate-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v3m0 12v3M3 12h3m12 0h3m-2.1-6.9-2.1 2.1m-9.6 9.6-2.1 2.1m0-13.8 2.1 2.1m9.6 9.6 2.1 2.1M15 9l1.1 3-1.1 3-3 1.1-3-1.1L7.9 12 9 9l3-1.1L15 9Z" /></svg>Plan</button>
-                <button type="submit" className={`group flex items-center gap-1.5 rounded-full bg-[#1688ee] px-3 py-1.5 text-[10px] font-semibold text-white transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[#36a0ff] ${planMode ? 'px-5 shadow-[0_0_24px_rgba(22,136,238,0.4)]' : 'shadow-[0_0_14px_rgba(22,136,238,0.2)]'}`}>{planMode ? 'Generate plan' : 'Build now'} <ArrowIcon /></button>
+                <button type="button" onClick={() => setPlanMode((c) => !c)} aria-pressed={planMode} className={`group flex items-center gap-1 rounded-full px-3 py-1.5 text-[10px] font-semibold transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${planMode ? 'bg-[#21415c] text-[#b8e4ff] shadow-[0_0_0_1px_rgba(88,180,239,0.22)]' : 'bg-[#1c3950] text-white/80 hover:bg-[#285879]'}`}><svg className="h-3 w-3 transition-transform duration-500 group-hover:rotate-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v3m0 12v3M3 12h3m12 0h3m-2.1-6.9-2.1 2.1m-9.6 9.6-2.1 2.1m0-13.8 2.1 2.1m9.6 9.6 2.1 2.1M15 9l1.1 3-1.1 3-3 1.1-3-1.1L7.9 12 9 9l3-1.1L15 9Z" /></svg>Plan</button>
+                <button type="submit" disabled={isCreating} className={`group flex items-center gap-1.5 rounded-full bg-[#1688ee] px-3 py-1.5 text-[10px] font-semibold text-white transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[#36a0ff] disabled:opacity-50 ${planMode ? 'px-5 shadow-[0_0_24px_rgba(22,136,238,0.4)]' : 'shadow-[0_0_14px_rgba(22,136,238,0.2)]'}`}>{planMode ? 'Generate plan' : 'Build now'} <ArrowIcon /></button>
               </div>
             </div>
           </form>
+          <div className="mt-6 flex items-start justify-center gap-2 sm:gap-2.5">
+            {starters.map((starter) => (
+              <button key={starter.label} type="button" onClick={() => { setActiveStarter(starter.label); setSelectedStarter(starter.label); }} className={`relative flex w-[54px] flex-col items-center gap-1.5 rounded-[7px] px-1.5 py-2 text-[9px] transition-all sm:w-[58px] ${activeStarter === starter.label ? 'bg-[#075aa5] text-white shadow-[0_5px_18px_rgba(0,99,190,0.22)]' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}>
+                {starter.badge && <span className="absolute -right-1 -top-2 rounded bg-[#1594f5] px-1 py-0.5 text-[7px] font-semibold text-white">{starter.badge}</span>}
+                <span className="text-white/90">{starter.icon}</span>
+                {starter.label}
+              </button>
+            ))}
+          </div>
           <div className="mt-8 flex flex-wrap items-center justify-center gap-1.5 text-[10px] text-white/60">
             <span className="mr-1">or start from</span>
             <button type="button" onClick={() => handleNewProject(undefined, 'github')} disabled={isCreating} className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><GitHubIcon /> <span className="font-semibold">GitHub</span> <ArrowIcon /></button>
