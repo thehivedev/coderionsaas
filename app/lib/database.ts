@@ -109,14 +109,16 @@ export async function getProject(projectId: string): Promise<Project | null> {
   return data as Project | null;
 }
 
-export async function createProject(userId: string): Promise<Project | null> {
+export async function createProject(userId: string, projectType?: string): Promise<Project | null> {
+  const insertData: Record<string, unknown> = {
+    user_id: userId,
+    title: 'New project',
+    messages: [],
+  };
+  if (projectType) insertData.project_type = projectType;
   const { data, error } = await supabase
     .from('projects')
-    .insert({
-      user_id: userId,
-      title: 'New project',
-      messages: [],
-    })
+    .insert(insertData)
     .select()
     .maybeSingle();
 

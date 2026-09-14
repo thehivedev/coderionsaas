@@ -73,6 +73,7 @@ export default function RegisterRoute() {
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
   const initialPrompt = searchParams.get('prompt') || '';
+  const projectType = searchParams.get('type') || '';
   const emailRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -90,9 +91,10 @@ export default function RegisterRoute() {
     if (actionData?.success) {
       setMessage(actionData.message || 'Account created successfully.');
       const dest = actionData.redirectTo || redirectTo;
+      const typeParam = projectType ? `&type=${encodeURIComponent(projectType)}` : '';
       const loginUrl = initialPrompt
-        ? `/auth/login?redirectTo=${encodeURIComponent(dest)}&prompt=${encodeURIComponent(initialPrompt)}`
-        : `/auth/login?redirectTo=${encodeURIComponent(dest)}`;
+        ? `/auth/login?redirectTo=${encodeURIComponent(dest)}&prompt=${encodeURIComponent(initialPrompt)}${typeParam}`
+        : `/auth/login?redirectTo=${encodeURIComponent(dest)}${typeParam}`;
       setTimeout(() => {
         window.location.href = loginUrl;
       }, 2000);

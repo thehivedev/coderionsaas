@@ -41,7 +41,7 @@ export interface AIModel {
   updated_at: string;
 }
 
-export type ProjectType = 'react-web' | 'expo';
+export type ProjectType = 'react-web' | 'expo' | 'slides' | 'prototype';
 
 export interface Project {
   id: string;

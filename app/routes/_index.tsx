@@ -108,6 +108,7 @@ function PublicLanding() {
   const [activeStarter, setActiveStarter] = useState('Website');
   const [selectedStarter, setSelectedStarter] = useState<string | null>(null);
   const [showSignup, setShowSignup] = useState(false);
+  const starterToType: Record<string, string> = { Website: 'react-web', Slides: 'slides', App: 'expo', Prototype: 'prototype' };
   const starters = [
     { label: 'Website', icon: <GlobeIcon /> },
     { label: 'Slides', icon: <SlidesIcon />, badge: 'New' },
@@ -186,10 +187,10 @@ function PublicLanding() {
             <div className="mx-auto flex w-fit items-center gap-1.5 text-white"><span className="flex h-6 w-6 items-center justify-center rounded bg-white text-[#151517]"><BoltMark /></span><span className="text-[21px] font-bold italic tracking-[-0.08em]">{APP_NAME}</span></div>
             <h2 id="signup-title" className="mt-6 text-[11px] font-medium text-white/85">Create a new account using one of the options below</h2>
             <div className="mt-4 space-y-2">
-              <Link to="/auth/register" onClick={() => setShowSignup(false)} className="relative flex h-7 w-full items-center justify-center rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]"><svg className="absolute left-3 h-3 w-3" viewBox="0 0 24 24"><path fill="currentColor" d="M21.8 12.2c0-.7-.1-1.3-.2-1.9H12v3.6h5.5a4.7 4.7 0 0 1-2 3.1v2.6h3.2c1.9-1.8 3.1-4.4 3.1-7.4Z" /><path fill="currentColor" d="M12 22c2.7 0 5-.9 6.7-2.4l-3.2-2.6c-.9.6-2 .9-3.5.9-2.7 0-5-1.8-5.8-4.3H2.9v2.7A10.1 10.1 0 0 0 12 22Z" /><path fill="currentColor" d="M6.2 13.6a6 6 0 0 1 0-3.2V7.7H2.9a10.1 10.1 0 0 0 0 8.6l3.3-2.7Z" /><path fill="currentColor" d="M12 6.1c1.5 0 2.8.5 3.8 1.5l2.9-2.9C17 3.1 14.7 2 12 2a10.1 10.1 0 0 0-9.1 5.7l3.3 2.7C7 7.9 9.3 6.1 12 6.1Z" /></svg>Sign up with Google<span className="absolute right-2 rounded bg-white/[0.08] px-1.5 py-0.5 text-[7px] text-white/55">Last used</span></Link>
-              <Link to="/auth/register" onClick={() => setShowSignup(false)} className="relative flex h-7 w-full items-center justify-center gap-1.5 rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]"><GitHubIcon />Sign up with GitHub</Link>
-              <Link to="/auth/register" onClick={() => setShowSignup(false)} className="flex h-7 w-full items-center justify-center rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]">Sign up with email and password</Link>
-              <Link to="/auth/register" onClick={() => setShowSignup(false)} className="flex h-7 w-full items-center justify-center rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]">Sign up with SSO</Link>
+              <Link to={`/auth/register?prompt=${encodeURIComponent(prompt)}&type=${selectedStarter ? starterToType[selectedStarter] || 'react-web' : 'react-web'}`} onClick={() => setShowSignup(false)} className="relative flex h-7 w-full items-center justify-center rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]"><svg className="absolute left-3 h-3 w-3" viewBox="0 0 24 24"><path fill="currentColor" d="M21.8 12.2c0-.7-.1-1.3-.2-1.9H12v3.6h5.5a4.7 4.7 0 0 1-2 3.1v2.6h3.2c1.9-1.8 3.1-4.4 3.1-7.4Z" /><path fill="currentColor" d="M12 22c2.7 0 5-.9 6.7-2.4l-3.2-2.6c-.9.6-2 .9-3.5.9-2.7 0-5-1.8-5.8-4.3H2.9v2.7A10.1 10.1 0 0 0 12 22Z" /><path fill="currentColor" d="M6.2 13.6a6 6 0 0 1 0-3.2V7.7H2.9a10.1 10.1 0 0 0 0 8.6l3.3-2.7Z" /><path fill="currentColor" d="M12 6.1c1.5 0 2.8.5 3.8 1.5l2.9-2.9C17 3.1 14.7 2 12 2a10.1 10.1 0 0 0-9.1 5.7l3.3 2.7C7 7.9 9.3 6.1 12 6.1Z" /></svg>Sign up with Google<span className="absolute right-2 rounded bg-white/[0.08] px-1.5 py-0.5 text-[7px] text-white/55">Last used</span></Link>
+              <Link to={`/auth/register?prompt=${encodeURIComponent(prompt)}&type=${selectedStarter ? starterToType[selectedStarter] || 'react-web' : 'react-web'}`} onClick={() => setShowSignup(false)} className="relative flex h-7 w-full items-center justify-center gap-1.5 rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]"><GitHubIcon />Sign up with GitHub</Link>
+              <Link to={`/auth/register?prompt=${encodeURIComponent(prompt)}&type=${selectedStarter ? starterToType[selectedStarter] || 'react-web' : 'react-web'}`} onClick={() => setShowSignup(false)} className="flex h-7 w-full items-center justify-center rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]">Sign up with email and password</Link>
+              <Link to={`/auth/register?prompt=${encodeURIComponent(prompt)}&type=${selectedStarter ? starterToType[selectedStarter] || 'react-web' : 'react-web'}`} onClick={() => setShowSignup(false)} className="flex h-7 w-full items-center justify-center rounded-[3px] border border-white/[0.1] text-[10px] font-semibold text-white/85 transition-colors hover:bg-white/[0.07]">Sign up with SSO</Link>
             </div>
             <p className="mt-4 text-[8px] leading-3 text-white/45">By signing up, you accept the <a href="#terms" className="underline underline-offset-2">Terms of Service</a> and<br /> acknowledge our <a href="#privacy" className="underline underline-offset-2">Privacy Policy</a>.</p>
           </div>
@@ -204,11 +205,12 @@ function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
   const [searchParams] = useSearchParams();
   const [isCreating, setIsCreating] = useState(false);
   const initialPrompt = searchParams.get('prompt') || '';
+  const projectType = searchParams.get('type') || '';
 
   async function handleNewProject(prompt?: string) {
     if (isCreating) return;
     setIsCreating(true);
-    const project = await createProject(data.user.id);
+    const project = await createProject(data.user.id, projectType || undefined);
     if (project) navigate(prompt ? `/project/${project.id}?prompt=${encodeURIComponent(prompt)}` : `/project/${project.id}`);
     setIsCreating(false);
   }
