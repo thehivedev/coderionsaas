@@ -102,18 +102,15 @@ export default function ProjectRoute() {
   }>();
 
   return (
-    <div className="flex h-screen bg-[#171717]">
-      <MenuClient user={user} profile={profile} />
-      <main className="flex-1 flex flex-col min-w-0">
-        <ProjectWorkspace
-          projectId={project.id}
-          projectTitle={project.title}
-          initialMessages={project.messages}
-          initialFiles={files}
-          models={models}
-          initialPrompt={initialPrompt}
-        />
-      </main>
-    </div>
+    <ProjectWorkspace
+      projectId={project.id}
+      projectTitle={project.title}
+      initialMessages={project.messages}
+      initialFiles={files}
+      models={models}
+      initialPrompt={initialPrompt}
+      user={user}
+      profile={profile}
+    />
   );
 }
