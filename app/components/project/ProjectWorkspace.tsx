@@ -54,8 +54,7 @@ export default function ProjectWorkspace({ projectId, projectTitle, projectType,
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, streamingContent]);
   useEffect(() => {
     if (initialPrompt && initialPrompt.trim() && messages.length === 0 && !isSending) {
-      setInput(initialPrompt);
-      const timer = setTimeout(() => handleSendMessage(), 100);
+      const timer = setTimeout(() => handleSendMessage(undefined, initialPrompt), 100);
       return () => clearTimeout(timer);
     }
   }, [initialPrompt]);
@@ -69,9 +68,10 @@ export default function ProjectWorkspace({ projectId, projectTitle, projectType,
     }
   }, [projectId, editingFile]);
 
-  async function handleSendMessage(event?: React.FormEvent) {
+  async function handleSendMessage(event?: React.FormEvent, overrideText?: string) {
     event?.preventDefault();
-    const trimmed = input.trim();
+    const text = overrideText ?? input;
+    const trimmed = text.trim();
     if (!trimmed || isSending) return;
     const userMessage: ChatMessage = { role: 'user', content: trimmed, timestamp: new Date().toISOString() };
     setInput(''); setIsSending(true); setError(null); setStreamingContent('');
