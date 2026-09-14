@@ -155,6 +155,7 @@ function __resolvePath(importer, importPath) {
   while (resolved.includes('/../')) {
     resolved = resolved.replace(/\\/[^/]+\\/\\.\\.\\//, '/');
   }
+  resolved = resolved.replace(/^\\/+/, '');
   const exts = ['', '.tsx', '.ts', '.jsx', '.js', '/index.tsx', '/index.ts', '/index.jsx', '/index.js', '.json'];
   for (const ext of exts) {
     const candidate = resolved + ext;
@@ -163,11 +164,32 @@ function __resolvePath(importer, importPath) {
   return resolved;
 }
 
+function __resolveEntryPath(importPath) {
+  const exts = ['', '.tsx', '.ts', '.jsx', '.js', '/index.tsx', '/index.ts', '/index.jsx', '/index.js'];
+  for (const ext of exts) {
+    if (__modules[importPath + ext]) return importPath + ext;
+  }
+  return null;
+}
+
 function __require(importer, importPath) {
   if (/\\.(css|scss|sass|less|svg|png|jpg|jpeg|gif|webp|woff|woff2|ttf|eot|otf)$/.test(importPath)) {
     return { __esModule: true, default: '' };
   }
   if (!importPath.startsWith('.') && !importPath.startsWith('/')) {
+    if (importer === '__entry__') {
+      const resolved = __resolveEntryPath(importPath);
+      if (resolved) {
+        if (__cache[resolved]) return __cache[resolved];
+        const module = { exports: {} };
+        __cache[resolved] = module.exports;
+        const localRequire = (p) => __require(resolved, p);
+        const factory = new Function('module', 'exports', 'require', __modules[resolved]);
+        factory(module, module.exports, localRequire);
+        __cache[resolved] = module.exports;
+        return module.exports;
+      }
+    }
     return __resolvePackage(importPath);
   }
   const resolved = __resolvePath(importer, importPath);

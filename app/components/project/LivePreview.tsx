@@ -162,7 +162,7 @@ export default function LivePreview({ files, projectType }: LivePreviewProps) {
               key={iframeKey}
               srcDoc={previewHtml}
               title="preview-mobile"
-              sandbox="allow-scripts allow-modals allow-forms allow-popups"
+              sandbox="allow-scripts allow-modals allow-forms allow-popups allow-same-origin"
               className="w-full h-full border-0"
               style={{ borderRadius: '32px' }}
             />
@@ -173,7 +173,7 @@ export default function LivePreview({ files, projectType }: LivePreviewProps) {
               key={iframeKey}
               srcDoc={previewHtml}
               title="preview-desktop"
-              sandbox="allow-scripts allow-modals allow-forms allow-popups"
+              sandbox="allow-scripts allow-modals allow-forms allow-popups allow-same-origin"
               className="w-full h-full border-0"
             />
           </div>
