@@ -3,12 +3,11 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const buildClientDir = path.join(__dirname, '..', 'build', 'client');
 const distDir = path.join(__dirname, '..', 'dist');
 
-const assetsDir = path.join(buildClientDir, 'assets');
+const assetsDir = path.join(distDir, 'assets');
 if (!fs.existsSync(assetsDir)) {
-  console.error('No assets directory found in build/client/');
+  console.error('No assets directory found in dist/');
   process.exit(1);
 }
 
@@ -45,24 +44,11 @@ const html = `<!DOCTYPE html>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
   ${cssLink}
 </head>
-<body class="bg-[#0e0e10] text-white antialiased">
+<body class="bg-[#171717] text-white antialiased">
   <div id="root"></div>
     ${scriptTags}
 </body>
 </html>`;
 
-if (!fs.existsSync(distDir)) {
-  fs.mkdirSync(distDir, { recursive: true });
-}
 fs.writeFileSync(path.join(distDir, 'index.html'), html);
-
-// Copy assets to dist
-const distAssetsDir = path.join(distDir, 'assets');
-if (!fs.existsSync(distAssetsDir)) {
-  fs.mkdirSync(distAssetsDir, { recursive: true });
-}
-for (const f of files) {
-  fs.copyFileSync(path.join(assetsDir, f), path.join(distAssetsDir, f));
-}
-
-console.log('Generated dist/index.html and copied assets');
+console.log('Generated dist/index.html');

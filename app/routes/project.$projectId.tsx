@@ -1,6 +1,6 @@
-import type { MetaFunction } from '@remix-run/node';
+import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
 import { useLoaderData, useSearchParams } from '@remix-run/react';
-import { supabase } from '~/lib/supabaseClient';
+import { createSupabaseServerClient } from '~/lib/supabaseServer';
 import { APP_NAME } from '~/lib/constants';
 import type { AIModel, ProjectFile, ProjectType } from '~/lib/types';
 import MenuClient from '~/components/sidebar/Menu';
@@ -10,11 +10,18 @@ export const meta: MetaFunction = () => [
   { title: `${APP_NAME} - Project` },
 ];
 
-export async function loader({ params }: { params: { projectId: string } }) {
-  const { data: { user } } = await supabase.auth.getUser();
+export async function loader({ request, params }: LoaderFunctionArgs) {
+  const { supabase, headers } = createSupabaseServerClient(request);
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   if (!user) {
-    throw new Response(null, { status: 302, headers: { Location: '/auth/login' } });
+    return new Response(null, {
+      status: 302,
+      headers: { Location: '/auth/login', ...headers },
+    });
   }
 
   const { data: profile, error: profileError } = await supabase
@@ -24,7 +31,10 @@ export async function loader({ params }: { params: { projectId: string } }) {
     .maybeSingle();
 
   if (profileError || !profile) {
-    throw new Response(null, { status: 302, headers: { Location: '/auth/login' } });
+    return new Response(null, {
+      status: 302,
+      headers: { Location: '/auth/login', ...headers },
+    });
   }
 
   const { data: project, error: projectError } = await supabase
@@ -35,7 +45,10 @@ export async function loader({ params }: { params: { projectId: string } }) {
     .maybeSingle();
 
   if (projectError || !project) {
-    throw new Response(null, { status: 302, headers: { Location: '/' } });
+    return new Response(null, {
+      status: 302,
+      headers: { Location: '/', ...headers },
+    });
   }
 
   const { data: files } = await supabase
@@ -58,6 +71,7 @@ export async function loader({ params }: { params: { projectId: string } }) {
       files: (files || []) as ProjectFile[],
       models: (models || []) as AIModel[],
     },
+    { headers }
   );
 }
 

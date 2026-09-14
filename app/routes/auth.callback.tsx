@@ -1,22 +1,45 @@
-import { useEffect } from 'react';
-import { useSearchParams } from '@remix-run/react';
-import { supabase } from '~/lib/supabaseClient';
+import type { LoaderFunctionArgs } from '@remix-run/node';
+import { createSupabaseServerClient } from '~/lib/supabaseServer';
+
+export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const code = url.searchParams.get('code');
+  const next = url.searchParams.get('next') || '/';
+
+  const { supabase, headers } = createSupabaseServerClient(request);
+
+  if (!code) {
+    return new Response(
+      JSON.stringify({ error: 'Authentication code not received.' }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...headers },
+      }
+    );
+  }
+
+  const { error } = await supabase.auth.exchangeCodeForSession(code);
+
+  if (error) {
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...headers },
+      }
+    );
+  }
+
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: next,
+      ...headers,
+    },
+  });
+}
 
 export default function AuthCallback() {
-  const [searchParams] = useSearchParams();
-  const next = searchParams.get('next') || '/';
-
-  useEffect(() => {
-    const code = searchParams.get('code');
-    if (code) {
-      supabase.auth.exchangeCodeForSession(code).then(() => {
-        window.location.href = next;
-      });
-    } else {
-      window.location.href = next;
-    }
-  }, [next, searchParams]);
-
   return (
     <div className="min-h-screen bg-[#171717] flex items-center justify-center">
       <div className="text-center">

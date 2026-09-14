@@ -1,7 +1,7 @@
-import type { MetaFunction } from '@remix-run/node';
+import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
 import { Link, useLoaderData, useNavigate, useSearchParams } from '@remix-run/react';
 import { useState, useEffect } from 'react';
-import { supabase } from '~/lib/supabaseClient';
+import { createSupabaseServerClient } from '~/lib/supabaseServer';
 import { APP_NAME, APP_VERSION } from '~/lib/constants';
 import type { AIModel, Project, Profile } from '~/lib/types';
 import MenuClient from '~/components/sidebar/Menu';
@@ -26,10 +26,11 @@ interface PublicHomeData {
 
 type HomeData = AuthenticatedHomeData | PublicHomeData;
 
-export async function loader() {
+export async function loader({ request }: LoaderFunctionArgs) {
+  const { supabase, headers } = createSupabaseServerClient(request);
   const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) return Response.json<PublicHomeData>({ authenticated: false });
+  if (!user) return Response.json<PublicHomeData>({ authenticated: false }, { headers });
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
@@ -37,7 +38,7 @@ export async function loader() {
     .eq('id', user.id)
     .maybeSingle();
 
-  if (profileError || !profile) return Response.json<PublicHomeData>({ authenticated: false });
+  if (profileError || !profile) return Response.json<PublicHomeData>({ authenticated: false }, { headers });
 
   const { data: models } = await supabase
     .from('ai_models')
@@ -62,6 +63,7 @@ export async function loader() {
       defaultModelName,
       recentProjects: (projects || []) as Project[],
     },
+    { headers },
   );
 }
 

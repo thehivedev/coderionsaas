@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs, MetaFunction } from '@remix-run/node';
 import { useLoaderData, useActionData, useNavigation, Form } from '@remix-run/react';
-import { supabase } from '~/lib/supabaseClient';
+import { requireAdmin } from '~/lib/admin.server';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '~/lib/supabaseServer';
 import { APP_NAME } from '~/lib/constants';
 import AdminLayout from '~/components/admin/AdminLayout';
 import { useState } from 'react';
@@ -24,18 +25,18 @@ interface UsersData {
   users: AdminUser[];
 }
 
-export async function loader() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Response(null, { status: 302, headers: { Location: '/auth/login?redirectTo=/admin' } });
-  const { data: profile } = await supabase.from('profiles').select('id, email, is_admin').eq('id', user.id).maybeSingle();
-  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: '/' } });
+export async function loader({ request }: LoaderFunctionArgs) {
+  const result = await requireAdmin(request);
+  if ('redirect' in result) return result.redirect;
 
-  const { data: profiles } = await supabase
+  const serviceClient = createSupabaseServiceClient();
+
+  const { data: profiles } = await serviceClient
     .from('profiles')
     .select('id, email, full_name, token_balance, is_admin, created_at')
     .order('created_at', { ascending: false });
 
-  const { data: projectCounts } = await supabase
+  const { data: projectCounts } = await serviceClient
     .from('projects')
     .select('user_id')
     .order('user_id');
@@ -57,92 +58,92 @@ export async function loader() {
   }));
 
   return Response.json<UsersData>({
-    adminEmail: profile.email,
+    adminEmail: result.admin.email,
     users,
   });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Response(null, { status: 302, headers: { Location: '/auth/login?redirectTo=/admin' } });
-  const { data: profile } = await supabase.from('profiles').select('id, email, is_admin').eq('id', user.id).maybeSingle();
-  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: '/' } });
+  const result = await requireAdmin(request);
+  if ('redirect' in result) return result.redirect;
 
   const formData = await request.formData();
   const intent = String(formData.get('intent') || '');
   const userId = String(formData.get('userId') || '');
 
   if (!userId) {
-    return Response.json({ error: 'Missing user' }, { status: 400 });
+    return Response.json({ error: 'Missing user' }, { status: 400, headers: result.headers });
   }
+
+  const serviceClient = createSupabaseServiceClient();
 
   if (intent === 'toggle_admin') {
     const current = String(formData.get('current') || 'false');
     const newAdmin = current !== 'true';
 
-    const { error } = await supabase
+    const { error } = await serviceClient
       .from('profiles')
       .update({ is_admin: newAdmin })
       .eq('id', userId);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
     }
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: result.headers });
   }
 
   if (intent === 'add_tokens') {
     const amount = parseInt(String(formData.get('amount') || '0'), 10);
 
     if (!amount || amount <= 0) {
-      return Response.json({ error: 'Invalid amount' }, { status: 400 });
+      return Response.json({ error: 'Invalid amount' }, { status: 400, headers: result.headers });
     }
 
-    const { data: profile } = await supabase
+    const { data: profile } = await serviceClient
       .from('profiles')
       .select('token_balance')
       .eq('id', userId)
       .maybeSingle();
 
     if (!profile) {
-      return Response.json({ error: 'User not found' }, { status: 404 });
+      return Response.json({ error: 'User not found' }, { status: 404, headers: result.headers });
     }
 
     const newBalance = (profile.token_balance || 0) + amount;
 
-    const { error } = await supabase
+    const { error } = await serviceClient
       .from('profiles')
       .update({ token_balance: newBalance })
       .eq('id', userId);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
     }
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: result.headers });
   }
 
   if (intent === 'set_tokens') {
     const amount = parseInt(String(formData.get('amount') || '0'), 10);
 
     if (amount < 0) {
-      return Response.json({ error: 'Invalid amount' }, { status: 400 });
+      return Response.json({ error: 'Invalid amount' }, { status: 400, headers: result.headers });
     }
 
-    const { error } = await supabase
+    const { error } = await serviceClient
       .from('profiles')
       .update({ token_balance: amount })
       .eq('id', userId);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500 });
+      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
     }
 
-    return Response.json({ success: true });
+    return Response.json({ success: true }, { headers: result.headers });
   }
 
-  return Response.json({ error: 'Unrecognized action' }, { status: 400 });
+  return Response.json({ error: 'Unrecognized action' }, { status: 400, headers: result.headers });
 }
 
 export default function AdminUsers() {

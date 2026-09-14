@@ -1,6 +1,7 @@
 import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
 import { useLoaderData, Link } from '@remix-run/react';
-import { supabase } from '~/lib/supabaseClient';
+import { requireAdmin } from '~/lib/admin.server';
+import { createSupabaseServiceClient } from '~/lib/supabaseServer';
 import { APP_NAME } from '~/lib/constants';
 import AdminLayout from '~/components/admin/AdminLayout';
 
@@ -24,13 +25,13 @@ interface ProjectsData {
   projects: AdminProject[];
 }
 
-export async function loader() {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Response(null, { status: 302, headers: { Location: '/auth/login?redirectTo=/admin' } });
-  const { data: profile } = await supabase.from('profiles').select('id, email, is_admin').eq('id', user.id).maybeSingle();
-  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: '/' } });
+export async function loader({ request }: LoaderFunctionArgs) {
+  const result = await requireAdmin(request);
+  if ('redirect' in result) return result.redirect;
 
-  const { data: projects } = await supabase
+  const serviceClient = createSupabaseServiceClient();
+
+  const { data: projects } = await serviceClient
     .from('projects')
     .select('id, title, status, model_id, created_at, updated_at, user_id')
     .order('updated_at', { ascending: false })
@@ -38,7 +39,7 @@ export async function loader() {
 
   const userIds = [...new Set((projects || []).map((p: { user_id: string }) => p.user_id))];
 
-  const { data: profiles } = await supabase
+  const { data: profiles } = await serviceClient
     .from('profiles')
     .select('id, email')
     .in('id', userIds.length > 0 ? userIds : ['00000000-0000-0000-0000-000000000000']);
@@ -48,7 +49,7 @@ export async function loader() {
     emailMap[(p as { id: string }).id] = (p as { email: string }).email;
   }
 
-  const { data: fileCounts } = await supabase
+  const { data: fileCounts } = await serviceClient
     .from('project_files')
     .select('project_id');
 
@@ -70,7 +71,7 @@ export async function loader() {
   }));
 
   return Response.json<ProjectsData>({
-    adminEmail: profile.email,
+    adminEmail: result.admin.email,
     projects: adminProjects,
   });
 }
