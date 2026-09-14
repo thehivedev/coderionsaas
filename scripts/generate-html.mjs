@@ -34,7 +34,7 @@ const cssLink = cssFile ? `<link rel="stylesheet" href="/assets/${cssFile}">` : 
 const scriptTags = scripts.map((f) => `<script type="module" src="/assets/${f}"></script>`).join('\n    ');
 
 const html = `<!DOCTYPE html>
-<html lang="es">
+<html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
