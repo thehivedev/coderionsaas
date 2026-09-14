@@ -221,28 +221,29 @@ export default function ProjectWorkspace({ projectId, projectTitle, initialMessa
 
       {/* Right side: preview area with floating file panel */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Compact segmented toolbar */}
-        <div className="flex h-11 shrink-0 items-center border-b border-[#2B2B2B] bg-[#1A1A1A] px-3">
-          <div className="flex items-center gap-0.5 rounded-xl border border-[#303030] bg-[#202020] p-1 shadow-inner shadow-black/20">
+        {/* Toolbar: Files | Preview on left, GitHub on right */}
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-[#2B2B2B] bg-[#1A1A1A] px-3 py-2">
+          <div className="flex items-center gap-1 rounded-full border border-[#303030] bg-[#202020] p-1 shadow-inner shadow-black/20">
             <button
               onClick={() => { setExpandedToolbar('files'); setShowFilePanel(!showFilePanel); }}
-              className={`flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs transition-all duration-200 ${expandedToolbar === 'files' ? 'bg-[#304B73] text-[#CFE1FF]' : 'text-[#777] hover:bg-[#2A2A2A] hover:text-white'}`}
+              className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-all duration-200 ${expandedToolbar === 'files' ? 'bg-[#304B73] text-[#CFE1FF] shadow-sm' : 'text-[#777] hover:bg-[#2A2A2A] hover:text-white'}`}
               title="Files"
             >
               <Icon name="files" className="h-3.5 w-3.5" />
               {expandedToolbar === 'files' && <span>Files</span>}
-              {expandedToolbar === 'files' && files.length > 0 && <span className="rounded bg-[#3C5D8D] px-1.5 py-0.5 text-[10px] text-[#CFE1FF]">{files.length}</span>}
+              {expandedToolbar === 'files' && files.length > 0 && <span className="rounded-full bg-[#3C5D8D] px-1.5 py-0.5 text-[10px] text-[#CFE1FF]">{files.length}</span>}
             </button>
             <button
               onClick={() => { setExpandedToolbar('preview'); setEditingFile(null); }}
-              className={`flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs transition-all duration-200 ${expandedToolbar === 'preview' ? 'bg-[#304B73] text-[#CFE1FF]' : 'text-[#777] hover:bg-[#2A2A2A] hover:text-white'}`}
+              className={`flex h-7 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-all duration-200 ${expandedToolbar === 'preview' ? 'bg-[#304B73] text-[#CFE1FF] shadow-sm' : 'text-[#777] hover:bg-[#2A2A2A] hover:text-white'}`}
               title="Preview"
             >
               <Icon name="eye" className="h-3.5 w-3.5" />
               {expandedToolbar === 'preview' && <span>Preview</span>}
             </button>
-            <GitHubPanel projectId={projectId} onImported={refreshFiles} compact expanded={expandedToolbar === 'github'} onOpen={() => setExpandedToolbar('github')} />
           </div>
+
+          <GitHubPanel projectId={projectId} onImported={refreshFiles} compact expanded={expandedToolbar === 'github'} onOpen={() => setExpandedToolbar('github')} />
         </div>
 
         {/* Expandable file explorer + main content */}
