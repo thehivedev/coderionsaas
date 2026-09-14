@@ -33,7 +33,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   if (profileError || !profile) {
     return new Response(null, {
@@ -45,13 +45,12 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     });
   }
 
-  // Verify chat belongs to user
   const { data: chat, error: chatError } = await supabase
     .from('chats')
     .select('id')
     .eq('id', params.chatId)
     .eq('user_id', user.id)
-    .single();
+    .maybeSingle();
 
   if (chatError || !chat) {
     return new Response(null, {
@@ -63,21 +62,16 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     });
   }
 
-  return new Response(
-    JSON.stringify({
+  return Response.json(
+    {
       user: {
         id: user.id,
         email: user.email,
       },
       profile,
       chatId: params.chatId,
-    }),
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers,
-      },
-    }
+    },
+    { headers }
   );
 }
 

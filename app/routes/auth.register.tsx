@@ -28,9 +28,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
   }
 
-  return new Response(null, {
-    headers,
-  });
+  return new Response(null, { headers });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -53,35 +51,24 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 
   if (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers,
-        },
-      }
+    return Response.json(
+      { error: error.message },
+      { status: 400, headers }
     );
   }
 
-  return new Response(
-    JSON.stringify({
-      success: true,
-      message: 'Cuenta creada. Revisa tu correo electrónico para confirmar tu cuenta.',
-    }),
+  return Response.json(
     {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers,
-      },
-    }
+      success: true,
+      message: 'Cuenta creada. Ya puedes iniciar sesión.',
+      redirectTo,
+    },
+    { status: 200, headers }
   );
 }
 
 export default function RegisterRoute() {
-  const actionData = useActionData<{ error?: string; success?: boolean; message?: string }>();
+  const actionData = useActionData<{ error?: string; success?: boolean; message?: string; redirectTo?: string }>();
   const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
@@ -101,8 +88,11 @@ export default function RegisterRoute() {
 
     if (actionData?.success) {
       setMessage(actionData.message || 'Cuenta creada correctamente.');
+      setTimeout(() => {
+        window.location.href = `/auth/login?redirectTo=${encodeURIComponent(actionData.redirectTo || redirectTo)}`;
+      }, 2000);
     }
-  }, [actionData]);
+  }, [actionData, redirectTo]);
 
   return (
     <div className="min-h-screen bg-[#171717] flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden">

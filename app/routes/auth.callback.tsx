@@ -6,19 +6,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const code = url.searchParams.get('code');
   const next = url.searchParams.get('next') || '/';
 
+  const { supabase, headers } = createSupabaseServerClient(request);
+
   if (!code) {
     return new Response(
       JSON.stringify({ error: 'No se recibió el código de autenticación.' }),
       {
         status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json', ...headers },
       }
     );
   }
-
-  const { supabase, headers } = createSupabaseServerClient(request);
 
   const { error } = await supabase.auth.exchangeCodeForSession(code);
 
@@ -27,9 +25,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       JSON.stringify({ error: error.message }),
       {
         status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json', ...headers },
       }
     );
   }

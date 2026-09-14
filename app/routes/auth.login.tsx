@@ -28,9 +28,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
   }
 
-  return new Response(null, {
-    headers,
-  });
+  return new Response(null, { headers });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -47,32 +45,20 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 
   if (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          ...headers,
-        },
-      }
+    return Response.json(
+      { error: error.message },
+      { status: 400, headers }
     );
   }
 
-  return new Response(
-    JSON.stringify({ success: true }),
-    {
-      status: 200,
-      headers: {
-        Location: redirectTo,
-        ...headers,
-      },
-    }
+  return Response.json(
+    { success: true, redirectTo },
+    { status: 200, headers }
   );
 }
 
 export default function LoginRoute() {
-  const actionData = useActionData<{ error?: string; success?: boolean }>();
+  const actionData = useActionData<{ error?: string; success?: boolean; redirectTo?: string }>();
   const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
@@ -89,7 +75,7 @@ export default function LoginRoute() {
     }
 
     if (actionData?.success) {
-      window.location.href = redirectTo;
+      window.location.href = actionData.redirectTo || redirectTo;
     }
   }, [actionData, redirectTo]);
 

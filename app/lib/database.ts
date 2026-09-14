@@ -6,14 +6,14 @@ export async function getProfile(userId: string): Promise<Profile | null> {
     .from('profiles')
     .select('*')
     .eq('id', userId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching profile:', error);
     return null;
   }
 
-  return data as Profile;
+  return data as Profile | null;
 }
 
 export async function getChats(userId: string): Promise<Chat[]> {
@@ -36,14 +36,14 @@ export async function getChat(chatId: string): Promise<Chat | null> {
     .from('chats')
     .select('*')
     .eq('id', chatId)
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error fetching chat:', error);
     return null;
   }
 
-  return data as Chat;
+  return data as Chat | null;
 }
 
 export async function createChat(userId: string): Promise<Chat | null> {
@@ -55,14 +55,14 @@ export async function createChat(userId: string): Promise<Chat | null> {
       messages: [],
     })
     .select()
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error creating chat:', error);
     return null;
   }
 
-  return data as Chat;
+  return data as Chat | null;
 }
 
 export async function updateChatMessages(

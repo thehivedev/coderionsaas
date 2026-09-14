@@ -32,7 +32,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
 
   if (profileError || !profile) {
     return new Response(null, {
@@ -44,20 +44,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
   }
 
-  return new Response(
-    JSON.stringify({
+  return Response.json(
+    {
       user: {
         id: user.id,
         email: user.email,
       },
       profile,
-    }),
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        ...headers,
-      },
-    }
+    },
+    { headers }
   );
 }
 

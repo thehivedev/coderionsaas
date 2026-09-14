@@ -3,6 +3,10 @@ import Stripe from 'stripe';
 const stripeSecretKey = process.env.STRIPE_SECRET_KEY || '';
 const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET || '';
 
+if (!stripeSecretKey) {
+  console.warn('STRIPE_SECRET_KEY is not configured — Stripe features will not work');
+}
+
 export const stripe = new Stripe(stripeSecretKey, {
   apiVersion: '2025-03-31.basil',
   typescript: true,

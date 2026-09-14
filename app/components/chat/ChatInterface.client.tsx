@@ -1,6 +1,5 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { useNavigate } from '@remix-run/react';
-import { getChat, updateChatMessages, deductTokens } from '~/lib/database';
+import { useState, useEffect, useRef } from 'react';
+import { getChat, updateChatMessages } from '~/lib/database';
 import type { Chat, ChatMessage, Profile } from '~/lib/types';
 
 interface ChatInterfaceProps {
@@ -8,9 +7,6 @@ interface ChatInterfaceProps {
   user: { id: string; email: string };
   initialProfile: Profile;
 }
-
-const MODEL = 'deepseek/deepseek-v4-pro-0813';
-const PROVIDER = 'OpenRouter';
 
 export default function ChatInterface({ chatId, user, initialProfile }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -20,20 +16,14 @@ export default function ChatInterface({ chatId, user, initialProfile }: ChatInte
   const [tokenBalance, setTokenBalance] = useState(initialProfile.token_balance);
   const [error, setError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const navigate = useNavigate();
 
   useEffect(() => {
     loadChat();
   }, [chatId]);
 
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  function scrollToBottom() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }
+  }, [messages]);
 
   async function loadChat() {
     setIsLoading(true);
@@ -47,83 +37,55 @@ export default function ChatInterface({ chatId, user, initialProfile }: ChatInte
     setIsLoading(false);
   }
 
-  function estimateTokens(text: string): number {
-    // Estimación simple: ~4 caracteres por token
-    return Math.ceil(text.length / 4);
-  }
-
   async function handleSendMessage(e?: React.FormEvent) {
     e?.preventDefault();
-    if (!input.trim() || isSending || tokenBalance <= 0) return;
+    const trimmed = input.trim();
+    if (!trimmed || isSending || tokenBalance <= 0) return;
 
     const userMessage: ChatMessage = {
       role: 'user',
-      content: input.trim(),
+      content: trimmed,
       timestamp: new Date().toISOString(),
     };
-
-    const inputTokens = estimateTokens(userMessage.content);
-    const estimatedOutputTokens = Math.ceil(inputTokens * 1.5);
-    const totalTokens = inputTokens + estimatedOutputTokens;
-
-    if (totalTokens > tokenBalance) {
-      setError('No tienes suficientes tokens para enviar este mensaje. Recarga tu saldo.');
-      return;
-    }
 
     setInput('');
     setIsSending(true);
     setError(null);
 
-    const updatedMessages = [...messages, userMessage];
-    setMessages(updatedMessages);
+    const optimisticMessages = [...messages, userMessage];
+    setMessages(optimisticMessages);
 
     try {
-      // Llamada a la API de OpenRouter
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      const response = await fetch('/api/chat', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${process.env.OPENROUTER_API_KEY || ''}`,
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          model: MODEL,
-          messages: updatedMessages.map(({ role, content }) => ({ role, content })),
+          chatId,
+          messages: optimisticMessages,
         }),
       });
 
+      const data = await response.json();
+
       if (!response.ok) {
-        throw new Error(`Error de API: ${response.status}`);
+        const errorMsg = data?.error || 'Error al enviar el mensaje.';
+        if (response.status === 402 && data?.tokenBalance !== undefined) {
+          setTokenBalance(data.tokenBalance);
+        }
+        setError(errorMsg);
+        setMessages(messages);
+        return;
       }
 
-      const data = await response.json();
-      const assistantContent = data.choices?.[0]?.message?.content || 'No se pudo generar una respuesta.';
-      const actualOutputTokens = data.usage?.completion_tokens || estimatedOutputTokens;
-      const actualInputTokens = data.usage?.prompt_tokens || inputTokens;
-      const actualTotalTokens = actualInputTokens + actualOutputTokens;
-
-      const assistantMessage: ChatMessage = {
-        role: 'assistant',
-        content: assistantContent,
-        timestamp: new Date().toISOString(),
-      };
-
-      const finalMessages = [...updatedMessages, assistantMessage];
+      const assistantMessage: ChatMessage = data.message;
+      const finalMessages = [...optimisticMessages, assistantMessage];
       setMessages(finalMessages);
 
-      // Descontar tokens
-      const newBalance = await deductTokens(user.id, actualTotalTokens);
-      if (newBalance !== null) {
-        setTokenBalance(newBalance);
+      if (data.tokenBalance !== undefined) {
+        setTokenBalance(data.tokenBalance);
       }
-
-      // Actualizar chat en Supabase
-      const title = messages.length === 0 ? userMessage.content.slice(0, 50) : undefined;
-      await updateChatMessages(chatId, finalMessages, title);
-    } catch (err) {
-      console.error('Error sending message:', err);
-      setError('Error al enviar el mensaje. Inténtalo de nuevo.');
-      // Revertir mensaje del usuario
+    } catch {
+      setError('Error de conexión. Inténtalo de nuevo.');
       setMessages(messages);
     } finally {
       setIsSending(false);
@@ -147,6 +109,8 @@ export default function ChatInterface({ chatId, user, initialProfile }: ChatInte
       </div>
     );
   }
+
+  const isOutOfTokens = tokenBalance <= 0;
 
   return (
     <div className="flex-1 flex flex-col h-full">
@@ -218,19 +182,18 @@ export default function ChatInterface({ chatId, user, initialProfile }: ChatInte
         <form onSubmit={handleSendMessage} className="max-w-4xl mx-auto">
           <div className="flex items-end gap-3 bg-[#262626] rounded-2xl ring-1 ring-[#2F2F2F] p-3 focus-within:ring-[#9E7FFF]/50 transition-all">
             <textarea
-              ref={textareaRef}
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={tokenBalance <= 0 ? 'Sin tokens disponibles. Recarga tu saldo.' : 'Escribe un mensaje...'}
-              disabled={tokenBalance <= 0 || isSending}
+              placeholder={isOutOfTokens ? 'Sin tokens disponibles. Recarga tu saldo.' : 'Escribe un mensaje...'}
+              disabled={isOutOfTokens || isSending}
               rows={1}
               className="flex-1 bg-transparent text-white placeholder-[#A3A3A3] resize-none focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed text-sm leading-relaxed"
               style={{ minHeight: '24px', maxHeight: '120px' }}
             />
             <button
               type="submit"
-              disabled={!input.trim() || isSending || tokenBalance <= 0}
+              disabled={!input.trim() || isSending || isOutOfTokens}
               className="flex-shrink-0 bg-[#9E7FFF] text-white rounded-xl p-2.5 hover:bg-[#8B6EE6] focus:outline-none focus:ring-2 focus:ring-[#9E7FFF]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
               aria-label="Enviar mensaje"
             >
