@@ -7,6 +7,7 @@ const Editor = lazy(() => import('@monaco-editor/react').then((m) => ({ default:
 interface CodeEditorProps {
   file: ProjectFile | null;
   onContentChange: (fileId: string, content: string) => void;
+  onClose?: () => void;
 }
 
 function mapLanguage(lang: string): string {
@@ -30,7 +31,7 @@ function mapLanguage(lang: string): string {
   return map[lang] || 'plaintext';
 }
 
-export default function CodeEditor({ file, onContentChange }: CodeEditorProps) {
+export default function CodeEditor({ file, onContentChange, onClose }: CodeEditorProps) {
   const [content, setContent] = useState('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
 
@@ -92,6 +93,18 @@ export default function CodeEditor({ file, onContentChange }: CodeEditorProps) {
             </svg>
             Copy
           </button>
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="text-xs text-[#A3A3A3] hover:text-white transition-colors flex items-center gap-1"
+              title="Close editor and return to preview"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+              Close
+            </button>
+          )}
         </div>
       </div>
 

@@ -18,9 +18,7 @@ interface ProjectWorkspaceProps {
   profile: Profile;
 }
 
-type PanelView = 'editor' | 'preview' | 'split';
-
-function Icon({ name, className = 'h-4 w-4' }: { name: 'send' | 'code' | 'eye' | 'folder' | 'sparkle' | 'chevron' | 'panel'; className?: string }) {
+function Icon({ name, className = 'h-4 w-4' }: { name: 'send' | 'code' | 'eye' | 'folder' | 'sparkle' | 'chevron' | 'close' | 'files'; className?: string }) {
   const paths: Record<string, React.ReactNode> = {
     send: <path strokeLinecap="round" strokeLinejoin="round" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />,
     code: <path strokeLinecap="round" strokeLinejoin="round" d="M8 9l-4 3 4 3m8-6l4 3-4 3m-3-9l-2 12" />,
@@ -28,7 +26,8 @@ function Icon({ name, className = 'h-4 w-4' }: { name: 'send' | 'code' | 'eye' |
     folder: <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />,
     sparkle: <path strokeLinecap="round" strokeLinejoin="round" d="M12 3l1.4 5.6L19 10l-5.6 1.4L12 17l-1.4-5.6L5 10l5.6-1.4L12 3zM19 16l.5 2.5L22 19l-2.5.5L19 22l-.5-2.5L16 19l2.5-.5L19 16z" />,
     chevron: <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />,
-    panel: <><path strokeLinecap="round" strokeLinejoin="round" d="M4 5h16v14H4z" /><path strokeLinecap="round" d="M15 5v14" /></>,
+    close: <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />,
+    files: <><path strokeLinecap="round" strokeLinejoin="round" d="M13 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V9l-6-6z" /><path strokeLinecap="round" strokeLinejoin="round" d="M13 3v6h6" /></>,
   };
   return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>{paths[name]}</svg>;
 }
@@ -43,12 +42,12 @@ export default function ProjectWorkspace({ projectId, projectTitle, initialMessa
   const [selectedModelId, setSelectedModelId] = useState(models[0]?.id || '');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
   const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null);
-  const [panelView, setPanelView] = useState<PanelView>('preview');
-  const [showFiles, setShowFiles] = useState(true);
+  const [showFilePanel, setShowFilePanel] = useState(false);
+  const [editingFile, setEditingFile] = useState<ProjectFile | null>(null);
+  const [expandedToolbar, setExpandedToolbar] = useState<'files' | 'preview' | 'github'>('preview');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, streamingContent]);
-  useEffect(() => { if (files.length > 0 && !selectedFile) setSelectedFile(files[0]); }, [files, selectedFile]);
   useEffect(() => {
     if (initialPrompt && initialPrompt.trim() && messages.length === 0 && !isSending) {
       setInput(initialPrompt);
@@ -60,12 +59,11 @@ export default function ProjectWorkspace({ projectId, projectTitle, initialMessa
   const refreshFiles = useCallback(async () => {
     const freshFiles = await getProjectFiles(projectId);
     setFiles(freshFiles);
-    if (freshFiles.length > 0) {
-      const current = freshFiles.find((file) => file.id === selectedFile?.id);
-      if (current) setSelectedFile(current);
-      else if (!selectedFile) setSelectedFile(freshFiles[0]);
+    if (editingFile) {
+      const updated = freshFiles.find((file) => file.id === editingFile.id);
+      if (updated) setEditingFile(updated);
     }
-  }, [projectId, selectedFile]);
+  }, [projectId, editingFile]);
 
   async function handleSendMessage(event?: React.FormEvent) {
     event?.preventDefault();
@@ -106,12 +104,25 @@ export default function ProjectWorkspace({ projectId, projectTitle, initialMessa
   }
 
   async function handleDeleteFile(fileId: string) {
-    if (await deleteProjectFile(fileId)) { setFiles((prev) => prev.filter((file) => file.id !== fileId)); if (selectedFile?.id === fileId) setSelectedFile(null); }
+    if (await deleteProjectFile(fileId)) {
+      setFiles((prev) => prev.filter((file) => file.id !== fileId));
+      if (selectedFile?.id === fileId) setSelectedFile(null);
+      if (editingFile?.id === fileId) setEditingFile(null);
+    }
+  }
+
+  function handleSelectFile(file: ProjectFile) {
+    setSelectedFile(file);
+    setEditingFile(file);
   }
 
   function handleContentChange(fileId: string, content: string) {
     setFiles((prev) => prev.map((file) => file.id === fileId ? { ...file, content } : file));
-    if (selectedFile?.id === fileId) setSelectedFile((prev) => prev ? { ...prev, content } : prev);
+    if (editingFile?.id === fileId) setEditingFile((prev) => prev ? { ...prev, content } : prev);
+  }
+
+  function handleCloseEditor() {
+    setEditingFile(null);
   }
 
   const selectedModel = models.find((model) => model.id === selectedModelId);
@@ -124,7 +135,6 @@ export default function ProjectWorkspace({ projectId, projectTitle, initialMessa
 
         {/* Chat section */}
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* Model selector bar */}
           <div className="flex h-10 shrink-0 items-center justify-between px-4">
             <span className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#737373]">
               <Icon name="sparkle" className="h-3.5 w-3.5 text-[#6C9DE8]" />
@@ -151,7 +161,6 @@ export default function ProjectWorkspace({ projectId, projectTitle, initialMessa
             </div>
           </div>
 
-          {/* Messages */}
           <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
             {messages.length === 0 && !streamingContent && (
               <div className="flex h-full flex-col items-center justify-center px-6 text-center">
@@ -194,19 +203,10 @@ export default function ProjectWorkspace({ projectId, projectTitle, initialMessa
 
           {error && <div className="px-4 pb-2"><div className="rounded-lg border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-300">{error}</div></div>}
 
-          {/* Input */}
           <div className="shrink-0 border-t border-[#2B2B2B] p-3">
             <form onSubmit={handleSendMessage}>
               <div className="rounded-xl border border-[#3A3A3A] bg-[#242424] p-2.5 transition focus-within:border-[#5A7EAE] focus-within:ring-2 focus-within:ring-[#385A85]/20">
-                <textarea
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Ask Coderion to build..."
-                  disabled={isSending}
-                  rows={3}
-                  className="w-full resize-none bg-transparent text-xs leading-5 text-white outline-none placeholder:text-[#777] disabled:opacity-50"
-                />
+                <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} placeholder="Ask Coderion to build..." disabled={isSending} rows={3} className="w-full resize-none bg-transparent text-xs leading-5 text-white outline-none placeholder:text-[#777] disabled:opacity-50" />
                 <div className="mt-2 flex items-center justify-between">
                   <span className="text-[10px] text-[#707070]">Enter to send</span>
                   <button type="submit" disabled={!input.trim() || isSending} className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#4B82D1] text-white transition hover:bg-[#5B91E0] disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message">
@@ -219,42 +219,64 @@ export default function ProjectWorkspace({ projectId, projectTitle, initialMessa
         </div>
       </aside>
 
-      {/* Right side: files + editor + preview */}
-      <div className="flex min-w-0 flex-1 flex-col lg:flex-row">
-        {/* File tree + editor panel */}
-        <section className="hidden w-[300px] shrink-0 flex-col border-r border-[#2B2B2B] bg-[#1D1D1D] lg:flex">
-          <div className="flex h-10 items-center justify-between border-b border-[#2B2B2B] px-3">
-            <button onClick={() => setShowFiles(!showFiles)} className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#9A9A9A] transition hover:text-white">
-              <Icon name="folder" className="h-3.5 w-3.5" />
-              Files
-              <span className="rounded bg-[#2A2A2A] px-1.5 py-0.5 text-[10px] font-normal text-[#777]">{files.length}</span>
+      {/* Right side: preview area with floating file panel */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Compact segmented toolbar */}
+        <div className="flex h-11 shrink-0 items-center border-b border-[#2B2B2B] bg-[#1A1A1A] px-3">
+          <div className="flex items-center gap-0.5 rounded-xl border border-[#303030] bg-[#202020] p-1 shadow-inner shadow-black/20">
+            <button
+              onClick={() => { setExpandedToolbar('files'); setShowFilePanel(!showFilePanel); }}
+              className={`flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs transition-all duration-200 ${expandedToolbar === 'files' ? 'bg-[#304B73] text-[#CFE1FF]' : 'text-[#777] hover:bg-[#2A2A2A] hover:text-white'}`}
+              title="Files"
+            >
+              <Icon name="files" className="h-3.5 w-3.5" />
+              {expandedToolbar === 'files' && <span>Files</span>}
+              {expandedToolbar === 'files' && files.length > 0 && <span className="rounded bg-[#3C5D8D] px-1.5 py-0.5 text-[10px] text-[#CFE1FF]">{files.length}</span>}
             </button>
-            <div className="flex items-center gap-1">
-              <button onClick={() => setPanelView('editor')} className={`rounded p-1.5 ${panelView === 'editor' ? 'bg-[#304B73] text-[#CFE1FF]' : 'text-[#777] hover:bg-[#292929] hover:text-white'}`} title="Show editor"><Icon name="code" className="h-3.5 w-3.5" /></button>
-              <button onClick={() => setPanelView('preview')} className={`rounded p-1.5 ${panelView === 'preview' ? 'bg-[#304B73] text-[#CFE1FF]' : 'text-[#777] hover:bg-[#292929] hover:text-white'}`} title="Show preview"><Icon name="eye" className="h-3.5 w-3.5" /></button>
-              <button onClick={() => setPanelView('split')} className={`rounded p-1.5 ${panelView === 'split' ? 'bg-[#304B73] text-[#CFE1FF]' : 'text-[#777] hover:bg-[#292929] hover:text-white'}`} title="Show both"><Icon name="panel" className="h-3.5 w-3.5" /></button>
-            </div>
+            <button
+              onClick={() => { setExpandedToolbar('preview'); setEditingFile(null); }}
+              className={`flex h-7 items-center gap-1.5 rounded-lg px-2.5 text-xs transition-all duration-200 ${expandedToolbar === 'preview' ? 'bg-[#304B73] text-[#CFE1FF]' : 'text-[#777] hover:bg-[#2A2A2A] hover:text-white'}`}
+              title="Preview"
+            >
+              <Icon name="eye" className="h-3.5 w-3.5" />
+              {expandedToolbar === 'preview' && <span>Preview</span>}
+            </button>
+            <GitHubPanel projectId={projectId} onImported={refreshFiles} compact expanded={expandedToolbar === 'github'} onOpen={() => setExpandedToolbar('github')} />
           </div>
-          {showFiles && (
-            <div className={`${panelView === 'preview' ? 'flex-1' : 'h-[38%]'} min-h-0 overflow-y-auto border-b border-[#2B2B2B]`}>
-              <FileTree files={files} selectedFile={selectedFile} onSelectFile={setSelectedFile} onDeleteFile={handleDeleteFile} />
-            </div>
-          )}
-          {panelView !== 'preview' && (
-            <div className="min-h-0 flex-1 overflow-hidden">
-              <CodeEditor file={selectedFile} onContentChange={handleContentChange} />
-            </div>
-          )}
-          <div className="shrink-0 border-t border-[#2B2B2B]">
-            <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#737373]">GitHub</div>
-            <GitHubPanel projectId={projectId} onImported={refreshFiles} />
-          </div>
-        </section>
+        </div>
 
-        {/* Preview area */}
-        <main className="min-w-0 flex-1 bg-[#101010]">
-          <LivePreview files={files} />
-        </main>
+        {/* Expandable file explorer + main content */}
+        <div className="flex min-h-0 flex-1 overflow-hidden">
+          <aside className={`shrink-0 overflow-hidden border-r border-[#2B2B2B] bg-[#171717] transition-all duration-200 ${showFilePanel ? 'w-[280px]' : 'w-0 border-r-0'}`}>
+            <div className="flex h-full w-[280px] flex-col">
+              <div className="flex h-10 shrink-0 items-center border-b border-[#2B2B2B] px-3">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#A3A3A3]">Files</span>
+                <span className="ml-2 rounded bg-[#292929] px-1.5 py-0.5 text-[10px] text-[#777]">{files.length}</span>
+              </div>
+              <div className="border-b border-[#2B2B2B] px-2 py-2">
+                <div className="flex items-center gap-2 rounded-md border border-[#2D2D2D] bg-[#202020] px-2 py-1.5 text-xs text-[#777]">
+                  <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="7" /><path strokeLinecap="round" d="m20 20-4-4" /></svg>
+                  <span>Search files</span>
+                </div>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto">
+                <FileTree files={files} selectedFile={selectedFile} onSelectFile={handleSelectFile} onDeleteFile={handleDeleteFile} />
+              </div>
+              <div className="shrink-0 border-t border-[#2B2B2B]">
+                <div className="px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#737373]">GitHub</div>
+                <GitHubPanel projectId={projectId} onImported={refreshFiles} />
+              </div>
+            </div>
+          </aside>
+
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-[#101010]">
+            {editingFile ? (
+              <CodeEditor file={editingFile} onContentChange={handleContentChange} onClose={handleCloseEditor} />
+            ) : (
+              <LivePreview files={files} />
+            )}
+          </main>
+        </div>
       </div>
     </div>
   );
