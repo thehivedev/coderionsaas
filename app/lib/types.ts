@@ -68,3 +68,33 @@ export interface ParsedFile {
   content: string;
   language: string;
 }
+
+export interface GitHubConnection {
+  id: string;
+  user_id: string;
+  github_username: string;
+  github_access_token: string;
+  github_avatar_url: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface GitHubRepo {
+  id: number;
+  name: string;
+  full_name: string;
+  html_url: string;
+  clone_url: string;
+  default_branch: string;
+  private: boolean;
+  description: string | null;
+  updated_at: string;
+}
+
+export interface GitHubTreeItem {
+  path: string;
+  mode: '100644' | '100755' | '040000';
+  type: 'blob' | 'tree';
+  sha?: string;
+  content?: string;
+}

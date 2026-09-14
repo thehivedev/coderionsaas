@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Chat, Profile, Project, ProjectFile } from './types';
+import type { Chat, Profile, Project, ProjectFile, GitHubConnection } from './types';
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -165,6 +165,35 @@ export async function deleteProjectFile(fileId: string): Promise<boolean> {
 
   if (error) {
     console.error('Error deleting project file:', error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function getGitHubConnection(userId: string): Promise<GitHubConnection | null> {
+  const { data, error } = await supabase
+    .from('github_connections')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching GitHub connection:', error);
+    return null;
+  }
+
+  return data as GitHubConnection | null;
+}
+
+export async function deleteGitHubConnection(userId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('github_connections')
+    .delete()
+    .eq('user_id', userId);
+
+  if (error) {
+    console.error('Error deleting GitHub connection:', error);
     return false;
   }
 

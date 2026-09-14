@@ -4,6 +4,7 @@ import { getProjectFiles, deleteProjectFile } from '~/lib/database';
 import FileTree from './FileTree';
 import CodeEditor from './CodeEditor';
 import LivePreview from './LivePreview';
+import GitHubPanel from './GitHubPanel';
 
 interface ProjectWorkspaceProps {
   projectId: string;
@@ -301,6 +302,13 @@ export default function ProjectWorkspace({
               onSelectFile={setSelectedFile}
               onDeleteFile={handleDeleteFile}
             />
+          </div>
+          {/* GitHub panel */}
+          <div className="border-t border-[#2F2F2F]">
+            <div className="px-3 py-2">
+              <span className="text-xs font-medium text-[#A3A3A3] uppercase tracking-wider">GitHub</span>
+            </div>
+            <GitHubPanel projectId={projectId} onImported={refreshFiles} />
           </div>
         </div>
 
