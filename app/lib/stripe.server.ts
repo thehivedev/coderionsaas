@@ -16,7 +16,7 @@ export const STRIPE_WEBHOOK_SECRET = stripeWebhookSecret;
 
 export const TOKEN_PACKAGES = {
   basic: {
-    name: 'Básico',
+    name: 'Basic',
     tokens: 500_000,
     price: 10,
     priceId: process.env.STRIPE_PRICE_BASIC || '',
@@ -28,7 +28,7 @@ export const TOKEN_PACKAGES = {
     priceId: process.env.STRIPE_PRICE_PRO || '',
   },
   enterprise: {
-    name: 'Empresarial',
+    name: 'Enterprise',
     tokens: 10_000_000,
     price: 99,
     priceId: process.env.STRIPE_PRICE_ENTERPRISE || '',

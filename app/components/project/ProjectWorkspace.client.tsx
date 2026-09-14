@@ -102,7 +102,7 @@ export default function ProjectWorkspace({
 
       if (!response.ok) {
         const data = await response.json();
-        setError(data?.error || 'Error al enviar el mensaje.');
+        setError(data?.error || 'Error sending message.');
         setMessages(messages);
         return;
       }
@@ -144,7 +144,7 @@ export default function ProjectWorkspace({
                   await refreshFiles();
                 }
               } else if (data.type === 'error') {
-                setError(data.error || 'Error del servicio de IA.');
+                setError(data.error || 'AI service error.');
                 setMessages(messages);
               }
             } catch {
@@ -154,7 +154,7 @@ export default function ProjectWorkspace({
         }
       }
     } catch {
-      setError('Error de conexion. Intenta de nuevo.');
+      setError('Connection error. Try again.');
       setMessages(messages);
     } finally {
       setIsSending(false);
@@ -198,7 +198,7 @@ export default function ProjectWorkspace({
           <h2 className="text-sm font-semibold text-white truncate max-w-[200px]">{projectTitle}</h2>
           {files.length > 0 && (
             <span className="text-xs px-2 py-0.5 rounded-full bg-[#9E7FFF]/20 text-[#9E7FFF]">
-              {files.length} {files.length === 1 ? 'archivo' : 'archivos'}
+              {files.length} {files.length === 1 ? 'file' : 'files'}
             </span>
           )}
         </div>
@@ -211,7 +211,7 @@ export default function ProjectWorkspace({
               className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
                 panelView === 'editor' ? 'bg-[#3F3F3F] text-white' : 'text-[#A3A3A3] hover:text-white'
               }`}
-              title="Solo editor"
+              title="Editor only"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 17V7h6v10H9z" />
@@ -233,7 +233,7 @@ export default function ProjectWorkspace({
               className={`text-xs px-2.5 py-1 rounded-md transition-colors ${
                 panelView === 'preview' ? 'bg-[#3F3F3F] text-white' : 'text-[#A3A3A3] hover:text-white'
               }`}
-              title="Solo preview"
+              title="Preview only"
             >
               <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" />
@@ -247,7 +247,7 @@ export default function ProjectWorkspace({
             className={`text-xs px-2.5 py-1.5 rounded-lg transition-colors ${
               showChat ? 'bg-[#9E7FFF]/10 text-[#9E7FFF]' : 'bg-[#262626] text-[#A3A3A3] hover:text-white'
             }`}
-            title="Mostrar/ocultar chat"
+            title="Show/hide chat"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
@@ -263,7 +263,7 @@ export default function ProjectWorkspace({
               <svg className="w-3.5 h-3.5 text-[#9E7FFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M3 13a2 2 0 00-2 2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2M3 13a2 2 0 002 2h14a2 2 0 002-2" />
               </svg>
-              {selectedModel?.name || 'Modelo'}
+              {selectedModel?.name || 'Model'}
               <svg className="w-3 h-3 text-[#A3A3A3]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                 <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
               </svg>
@@ -305,7 +305,7 @@ export default function ProjectWorkspace({
         {/* File tree sidebar */}
         <div className="w-56 border-r border-[#2F2F2F] bg-[#1E1E1E] flex-shrink-0 overflow-hidden flex flex-col">
           <div className="px-3 py-2 border-b border-[#2F2F2F]">
-            <span className="text-xs font-medium text-[#A3A3A3] uppercase tracking-wider">Archivos</span>
+            <span className="text-xs font-medium text-[#A3A3A3] uppercase tracking-wider">Files</span>
           </div>
           <div className="flex-1 overflow-y-auto">
             <FileTree
@@ -343,7 +343,7 @@ export default function ProjectWorkspace({
         {showChat && (
           <div className="w-80 border-l border-[#2F2F2F] bg-[#1E1E1E] flex-shrink-0 flex flex-col overflow-hidden">
             <div className="px-3 py-2 border-b border-[#2F2F2F]">
-              <span className="text-xs font-medium text-[#A3A3A3] uppercase tracking-wider">Chat IA</span>
+              <span className="text-xs font-medium text-[#A3A3A3] uppercase tracking-wider">AI Chat</span>
             </div>
 
             {/* Messages */}
@@ -354,7 +354,7 @@ export default function ProjectWorkspace({
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                   </svg>
                   <p className="text-xs text-[#A3A3A3]">
-                    Describe el proyecto que quieres crear
+                    Describe the project you want to create
                   </p>
                 </div>
               )}
@@ -418,7 +418,7 @@ export default function ProjectWorkspace({
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Describe tu proyecto..."
+                    placeholder="Describe your project..."
                     disabled={isSending}
                     rows={1}
                     className="flex-1 bg-transparent text-white placeholder-[#A3A3A3] resize-none focus:outline-none disabled:opacity-50 text-xs leading-relaxed"
@@ -428,7 +428,7 @@ export default function ProjectWorkspace({
                     type="submit"
                     disabled={!input.trim() || isSending}
                     className="flex-shrink-0 bg-[#9E7FFF] text-white rounded-lg p-1.5 hover:bg-[#8B6EE6] focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                    aria-label="Enviar"
+                    aria-label="Send"
                   >
                     {isSending ? (
                       <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">

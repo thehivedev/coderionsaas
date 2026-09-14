@@ -6,7 +6,7 @@ import { APP_NAME } from '~/lib/constants';
 import AdminLayout from '~/components/admin/AdminLayout';
 
 export const meta: MetaFunction = () => [
-  { title: `${APP_NAME} - Admin · Proyectos` },
+  { title: `${APP_NAME} - Admin · Projects` },
 ];
 
 interface AdminProject {
@@ -66,7 +66,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     model_id: p.model_id as string | null,
     created_at: p.created_at as string,
     updated_at: p.updated_at as string,
-    user_email: emailMap[p.user_id as string] || 'Desconocido',
+    user_email: emailMap[p.user_id as string] || 'Unknown',
     file_count: fileCountMap[p.id as string] || 0,
   }));
 
@@ -82,27 +82,27 @@ export default function AdminProjects() {
   return (
     <AdminLayout adminEmail={data.adminEmail}>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">Proyectos</h1>
-        <p className="text-sm text-[#A3A3A3] mt-1">{data.projects.length} proyectos en total.</p>
+        <h1 className="text-2xl font-bold text-white">Projects</h1>
+        <p className="text-sm text-[#A3A3A3] mt-1">{data.projects.length} projects in total.</p>
       </div>
 
       <div className="rounded-2xl bg-[#262626] ring-1 ring-[#2F2F2F] overflow-hidden">
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#2F2F2F]">
-              <th className="text-left text-xs font-medium text-[#A3A3A3] px-5 py-3">Título</th>
-              <th className="text-left text-xs font-medium text-[#A3A3A3] px-5 py-3">Usuario</th>
-              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Archivos</th>
-              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Modelo</th>
-              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Estado</th>
-              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Actualizado</th>
+              <th className="text-left text-xs font-medium text-[#A3A3A3] px-5 py-3">Title</th>
+              <th className="text-left text-xs font-medium text-[#A3A3A3] px-5 py-3">User</th>
+              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Files</th>
+              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Model</th>
+              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Status</th>
+              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Updated</th>
               <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3"></th>
             </tr>
           </thead>
           <tbody>
             {data.projects.length === 0 ? (
               <tr>
-                <td colSpan={7} className="text-center text-sm text-[#A3A3A3] py-8">No hay proyectos.</td>
+                <td colSpan={7} className="text-center text-sm text-[#A3A3A3] py-8">No projects.</td>
               </tr>
             ) : (
               data.projects.map((project) => (
@@ -121,20 +121,20 @@ export default function AdminProjects() {
                   </td>
                   <td className="px-5 py-3 text-center">
                     {project.status === 'active' ? (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">Activo</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400">Active</span>
                     ) : (
-                      <span className="text-xs px-2 py-0.5 rounded-full bg-[#3F3F3F] text-[#A3A3A3]">Archivado</span>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-[#3F3F3F] text-[#A3A3A3]">Archived</span>
                     )}
                   </td>
                   <td className="px-5 py-3 text-center">
-                    <span className="text-xs text-[#A3A3A3]">{new Date(project.updated_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
+                    <span className="text-xs text-[#A3A3A3]">{new Date(project.updated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</span>
                   </td>
                   <td className="px-5 py-3 text-center">
                     <Link
                       to={`/project/${project.id}`}
                       className="text-xs text-[#9E7FFF] hover:underline"
                     >
-                      Abrir →
+                      Open →
                     </Link>
                   </td>
                 </tr>

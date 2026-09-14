@@ -19,7 +19,7 @@ async function createBlob(
     },
     body: JSON.stringify({ content, encoding: 'utf-8' }),
   });
-  if (!res.ok) throw new Error('No se pudo crear blob');
+  if (!res.ok) throw new Error('Could not create blob');
   const data = await res.json();
   return data.sha;
 }
@@ -63,7 +63,7 @@ async function createTree(
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error('No se pudo crear el arbol');
+  if (!res.ok) throw new Error('Could not create tree');
   const data = await res.json();
   return data.sha;
 }
@@ -88,7 +88,7 @@ async function createCommit(
     },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error('No se pudo crear el commit');
+  if (!res.ok) throw new Error('Could not create commit');
   const data = await res.json();
   return data.sha;
 }
@@ -114,7 +114,7 @@ async function updateRef(
   );
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || 'No se pudo actualizar la rama');
+    throw new Error(err.message || 'Could not update branch');
   }
 }
 
@@ -139,7 +139,7 @@ async function createBranch(
   );
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || 'No se pudo crear la rama');
+    throw new Error(err.message || 'Could not create branch');
   }
 }
 
@@ -182,7 +182,7 @@ async function createRepo(
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || 'No se pudo crear el repo');
+    throw new Error(err.message || 'Could not create repo');
   }
   const data = await res.json();
   return {
@@ -204,7 +204,7 @@ export async function action({ request }: ActionFunctionArgs) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return Response.json({ error: 'No autenticado' }, { status: 401, headers });
+    return Response.json({ error: 'Not authenticated' }, { status: 401, headers });
   }
 
   let body: {
@@ -220,17 +220,17 @@ export async function action({ request }: ActionFunctionArgs) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: 'Cuerpo invalido' }, { status: 400, headers });
+    return Response.json({ error: 'Invalid body' }, { status: 400, headers });
   }
 
   const { projectId, repoUrl, newRepoName, branch, newBranch, commitMessage, openPR, isPrivate } = body;
 
   if (!projectId) {
-    return Response.json({ error: 'Falta projectId' }, { status: 400, headers });
+    return Response.json({ error: 'Missing projectId' }, { status: 400, headers });
   }
 
   if (!repoUrl && !newRepoName) {
-    return Response.json({ error: 'Especifica un repo o un nombre para crear uno nuevo' }, { status: 400, headers });
+    return Response.json({ error: 'Specify a repo or a name to create a new one' }, { status: 400, headers });
   }
 
   // Verify project ownership
@@ -242,7 +242,7 @@ export async function action({ request }: ActionFunctionArgs) {
     .maybeSingle();
 
   if (projectError || !project) {
-    return Response.json({ error: 'Proyecto no encontrado' }, { status: 404, headers });
+    return Response.json({ error: 'Project not found' }, { status: 404, headers });
   }
 
   // Get GitHub connection
@@ -254,7 +254,7 @@ export async function action({ request }: ActionFunctionArgs) {
     .maybeSingle();
 
   if (ghError || !ghConn) {
-    return Response.json({ error: 'Cuenta de GitHub no conectada' }, { status: 403, headers });
+    return Response.json({ error: 'GitHub account not connected' }, { status: 403, headers });
   }
 
   const token: string = ghConn.github_access_token;
@@ -268,7 +268,7 @@ export async function action({ request }: ActionFunctionArgs) {
     .order('path', { ascending: true });
 
   if (filesError || !dbFiles || dbFiles.length === 0) {
-    return Response.json({ error: 'No hay archivos para exportar' }, { status: 400, headers });
+    return Response.json({ error: 'No files to export' }, { status: 400, headers });
   }
 
   const files = dbFiles as ProjectFile[];
@@ -288,7 +288,7 @@ export async function action({ request }: ActionFunctionArgs) {
       targetBranch = created.defaultBranch;
     } catch (err) {
       return Response.json(
-        { error: err instanceof Error ? err.message : 'Error al crear repo' },
+        { error: err instanceof Error ? err.message : 'Error creating repo' },
         { status: 502, headers }
       );
     }
@@ -296,7 +296,7 @@ export async function action({ request }: ActionFunctionArgs) {
     // Push to existing repo
     const match = repoUrl!.match(/github\.com\/([^/]+)\/([^/.]+(?:\.git)?)$/);
     if (!match) {
-      return Response.json({ error: 'URL de repo invalida' }, { status: 400, headers });
+      return Response.json({ error: 'Invalid repo URL' }, { status: 400, headers });
     }
     owner = match[1];
     repo = match[2].replace(/\.git$/, '');
@@ -363,7 +363,7 @@ export async function action({ request }: ActionFunctionArgs) {
         targetBranch,
         baseBranchForPR,
         `Update from Coderion: ${project.title}`,
-        `Archivos actualizados desde Coderion.\n\n${files.length} archivos subidos.`
+        `Files updated from Coderion.\n\n${files.length} files pushed.`
       );
     }
 
@@ -380,7 +380,7 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   } catch (err) {
     return Response.json(
-      { error: err instanceof Error ? err.message : 'Error al subir archivos' },
+      { error: err instanceof Error ? err.message : 'Error pushing files' },
       { status: 502, headers }
     );
   }

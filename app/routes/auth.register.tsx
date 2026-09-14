@@ -6,8 +6,8 @@ import { APP_NAME } from '~/lib/constants';
 
 export const meta: MetaFunction = () => {
   return [
-    { title: `Crear cuenta | ${APP_NAME}` },
-    { name: 'description', content: 'Crea tu cuenta de Coderion y comienza a construir con IA.' },
+    { title: `Create account | ${APP_NAME}` },
+    { name: 'description', content: 'Create your Coderion account and start building with AI.' },
   ];
 };
 
@@ -60,7 +60,7 @@ export async function action({ request }: ActionFunctionArgs) {
   return Response.json(
     {
       success: true,
-      message: 'Cuenta creada. Ya puedes iniciar sesión.',
+      message: 'Account created. You can now log in.',
       redirectTo,
     },
     { status: 200, headers }
@@ -88,7 +88,7 @@ export default function RegisterRoute() {
     }
 
     if (actionData?.success) {
-      setMessage(actionData.message || 'Cuenta creada correctamente.');
+      setMessage(actionData.message || 'Account created successfully.');
       const dest = actionData.redirectTo || redirectTo;
       const loginUrl = initialPrompt
         ? `/auth/login?redirectTo=${encodeURIComponent(dest)}&prompt=${encodeURIComponent(initialPrompt)}`
@@ -115,11 +115,11 @@ export default function RegisterRoute() {
             </svg>
             <span className="text-2xl font-bold text-white tracking-tight">{APP_NAME}</span>
           </Link>
-          <h1 className="mt-6 text-3xl font-bold text-white tracking-tight">Crea tu cuenta</h1>
-          <p className="mt-2 text-sm text-[#A3A3A3]">Comienza a construir con IA en minutos</p>
+          <h1 className="mt-6 text-3xl font-bold text-white tracking-tight">Create your account</h1>
+          <p className="mt-2 text-sm text-[#A3A3A3]">Start building with AI in minutes</p>
           {initialPrompt && (
             <div className="mt-4 rounded-xl border border-[#9E7FFF]/30 bg-[#9E7FFF]/10 px-4 py-3 text-left">
-              <p className="text-xs font-medium text-[#9E7FFF] mb-1">Tu idea:</p>
+              <p className="text-xs font-medium text-[#9E7FFF] mb-1">Your idea:</p>
               <p className="text-sm text-white/80 line-clamp-3">{initialPrompt}</p>
             </div>
           )}
@@ -143,7 +143,7 @@ export default function RegisterRoute() {
 
             <div>
               <label htmlFor="fullName" className="block text-sm font-medium text-[#A3A3A3] mb-1.5">
-                Nombre completo
+                Full name
               </label>
               <input
                 id="fullName"
@@ -152,14 +152,14 @@ export default function RegisterRoute() {
                 autoComplete="name"
                 value={fullName}
                 onChange={(e) => setFullName(e.target.value)}
-                placeholder="Tu nombre"
+                placeholder="Your name"
                 className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-4 py-2.5 text-white placeholder-[#A3A3A3] focus:border-[#9E7FFF] focus:ring-2 focus:ring-[#9E7FFF]/20 focus:outline-none transition-colors"
               />
             </div>
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-[#A3A3A3] mb-1.5">
-                Correo electrónico
+                Email
               </label>
               <input
                 ref={emailRef}
@@ -170,14 +170,14 @@ export default function RegisterRoute() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@ejemplo.com"
+                placeholder="you@example.com"
                 className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-4 py-2.5 text-white placeholder-[#A3A3A3] focus:border-[#9E7FFF] focus:ring-2 focus:ring-[#9E7FFF]/20 focus:outline-none transition-colors"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-[#A3A3A3] mb-1.5">
-                Contraseña
+                Password
               </label>
               <input
                 id="password"
@@ -188,7 +188,7 @@ export default function RegisterRoute() {
                 minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Mínimo 8 caracteres"
+                placeholder="Minimum 8 characters"
                 className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-4 py-2.5 text-white placeholder-[#A3A3A3] focus:border-[#9E7FFF] focus:ring-2 focus:ring-[#9E7FFF]/20 focus:outline-none transition-colors"
               />
             </div>
@@ -198,20 +198,20 @@ export default function RegisterRoute() {
               disabled={isSubmitting}
               className="w-full rounded-lg bg-[#9E7FFF] py-2.5 px-4 text-white font-semibold hover:bg-[#8B6EE6] focus:outline-none focus:ring-2 focus:ring-[#9E7FFF]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {isSubmitting ? 'Creando cuenta...' : 'Crear cuenta'}
+              {isSubmitting ? 'Creating account...' : 'Create account'}
             </button>
           </Form>
         </div>
 
         <p className="mt-6 text-center text-sm text-[#A3A3A3]">
-          ¿Ya tienes una cuenta?{' '}
+          Already have an account?{' '}
           <Link to={`/auth/login?redirectTo=${encodeURIComponent(redirectTo)}`} className="font-semibold text-[#9E7FFF] hover:text-[#B39DFF] transition-colors">
-            Iniciar sesión
+            Log in
           </Link>
         </p>
         <p className="mt-2 text-center text-sm text-[#A3A3A3]">
           <Link to="/" className="text-[#A3A3A3] hover:text-white transition-colors">
-            ← Volver al inicio
+            ← Back to home
           </Link>
         </p>
       </div>

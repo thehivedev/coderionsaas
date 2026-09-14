@@ -67,10 +67,10 @@ export default function LivePreview({ files }: LivePreviewProps) {
             <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
             <path strokeLinecap="round" strokeLinejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
           </svg>
-          <h3 className="text-sm font-medium text-white mb-1">Vista previa no disponible</h3>
+          <h3 className="text-sm font-medium text-white mb-1">Preview not available</h3>
           <p className="text-xs text-[#A3A3A3] max-w-xs">
-            La vista previa en vivo aparece cuando el proyecto tiene un archivo index.html.
-            Para proyectos React, agrega un HTML con el punto de entrada.
+            Live preview appears when the project has an index.html file.
+            For React projects, add an HTML file with the entry point.
           </p>
         </div>
       </div>
@@ -106,14 +106,14 @@ export default function LivePreview({ files }: LivePreviewProps) {
               setLastRefresh(Date.now());
             }}
             className="text-[#A3A3A3] hover:text-white transition-colors p-1"
-            aria-label="Refrescar"
+            aria-label="Refresh"
           >
             <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.582m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </button>
           <span className="text-xs text-[#A3A3A3]">
-            {new Date(lastRefresh).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+            {new Date(lastRefresh).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
           </span>
         </div>
       </div>

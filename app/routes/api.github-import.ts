@@ -29,7 +29,7 @@ async function getTreeBlobs(
     }
   );
 
-  if (!treeRes.ok) throw new Error('No se pudo leer el arbol del repo');
+  if (!treeRes.ok) throw new Error('Could not read repo tree');
   const treeData = await treeRes.json();
   const blobs = (treeData.tree || []).filter(
     (item: { type: string; path: string }) => item.type === 'blob' && item.path
@@ -84,20 +84,20 @@ export async function action({ request }: ActionFunctionArgs) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return Response.json({ error: 'No autenticado' }, { status: 401, headers });
+    return Response.json({ error: 'Not authenticated' }, { status: 401, headers });
   }
 
   let body: { projectId?: string; repoUrl?: string };
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: 'Cuerpo invalido' }, { status: 400, headers });
+    return Response.json({ error: 'Invalid body' }, { status: 400, headers });
   }
 
   const { projectId, repoUrl } = body;
 
   if (!projectId || !repoUrl) {
-    return Response.json({ error: 'Faltan parametros' }, { status: 400, headers });
+    return Response.json({ error: 'Missing parameters' }, { status: 400, headers });
   }
 
   // Verify project ownership
@@ -109,7 +109,7 @@ export async function action({ request }: ActionFunctionArgs) {
     .maybeSingle();
 
   if (projectError || !project) {
-    return Response.json({ error: 'Proyecto no encontrado' }, { status: 404, headers });
+    return Response.json({ error: 'Project not found' }, { status: 404, headers });
   }
 
   // Get GitHub connection
@@ -121,7 +121,7 @@ export async function action({ request }: ActionFunctionArgs) {
     .maybeSingle();
 
   if (ghError || !ghConn) {
-    return Response.json({ error: 'Cuenta de GitHub no conectada' }, { status: 403, headers });
+    return Response.json({ error: 'GitHub account not connected' }, { status: 403, headers });
   }
 
   const token: string = ghConn.github_access_token;
@@ -129,7 +129,7 @@ export async function action({ request }: ActionFunctionArgs) {
   // Parse repo URL: https://github.com/owner/repo or https://github.com/owner/repo.git
   const match = repoUrl.match(/github\.com\/([^/]+)\/([^/.]+(?:\.git)?)$/);
   if (!match) {
-    return Response.json({ error: 'URL de repo invalida' }, { status: 400, headers });
+    return Response.json({ error: 'Invalid repo URL' }, { status: 400, headers });
   }
 
   const owner = match[1];
@@ -145,14 +145,14 @@ export async function action({ request }: ActionFunctionArgs) {
       },
     });
   } catch {
-    return Response.json({ error: 'No se pudo acceder al repo' }, { status: 502, headers });
+    return Response.json({ error: 'Could not access repo' }, { status: 502, headers });
   }
 
   if (!repoInfo.ok) {
     if (repoInfo.status === 404) {
-      return Response.json({ error: 'Repo no encontrado o sin acceso' }, { status: 404, headers });
+      return Response.json({ error: 'Repo not found or no access' }, { status: 404, headers });
     }
-    return Response.json({ error: 'Error al acceder al repo' }, { status: 502, headers });
+    return Response.json({ error: 'Error accessing repo' }, { status: 502, headers });
   }
 
   const repoData = await repoInfo.json();
@@ -164,13 +164,13 @@ export async function action({ request }: ActionFunctionArgs) {
     files = await getTreeBlobs(token, owner, repo, branch);
   } catch (err) {
     return Response.json(
-      { error: err instanceof Error ? err.message : 'Error al leer archivos' },
+      { error: err instanceof Error ? err.message : 'Error reading files' },
       { status: 502, headers }
     );
   }
 
   if (files.length === 0) {
-    return Response.json({ error: 'El repo no tiene archivos importables' }, { status: 400, headers });
+    return Response.json({ error: 'Repo has no importable files' }, { status: 400, headers });
   }
 
   // Insert files into project_files

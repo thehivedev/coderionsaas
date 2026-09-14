@@ -129,5 +129,5 @@ export function stripFileBlocks(response: string): string {
 
   cleaned = cleaned.replace(/\n{3,}/g, '\n\n').trim();
 
-  return cleaned || 'Proyecto generado correctamente.';
+  return cleaned || 'Project generated successfully.';
 }

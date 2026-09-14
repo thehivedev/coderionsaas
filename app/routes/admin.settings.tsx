@@ -23,8 +23,8 @@ interface SettingsData {
 }
 
 const CATEGORY_LABELS: Record<string, string> = {
-  ai: 'Inteligencia Artificial',
-  stripe: 'Pagos (Stripe)',
+  ai: 'Artificial Intelligence',
+  stripe: 'Payments (Stripe)',
   github: 'GitHub OAuth',
   general: 'General',
 };
@@ -62,7 +62,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const value = String(formData.get('value') || '');
 
     if (!key) {
-      return Response.json({ error: 'Falta la clave' }, { status: 400, headers });
+      return Response.json({ error: 'Missing the key' }, { status: 400, headers });
     }
 
     const { error } = await supabase
@@ -85,7 +85,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const is_secret = formData.get('is_secret') === 'true';
 
     if (!key) {
-      return Response.json({ error: 'Falta la clave' }, { status: 400, headers });
+      return Response.json({ error: 'Missing the key' }, { status: 400, headers });
     }
 
     const { error } = await supabase
@@ -114,7 +114,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({ success: true }, { headers });
   }
 
-  return Response.json({ error: 'Acción no reconocida' }, { status: 400, headers });
+  return Response.json({ error: 'Unrecognized action' }, { status: 400, headers });
 }
 
 export default function AdminSettings() {
@@ -131,9 +131,9 @@ export default function AdminSettings() {
   return (
     <AdminLayout adminEmail={data.adminEmail}>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">API Keys y Configuración</h1>
+        <h1 className="text-2xl font-bold text-white">API Keys and Configuration</h1>
         <p className="text-sm text-[#A3A3A3] mt-1">
-          Gestiona las claves de los servicios externos. Los valores se guardan en la base de datos.
+          Manage external service keys. Values are stored in the database.
         </p>
       </div>
 
@@ -144,7 +144,7 @@ export default function AdminSettings() {
       )}
       {actionData?.success && (
         <div className="mb-4 rounded-lg bg-green-500/10 border border-green-500/30 p-3">
-          <p className="text-sm text-green-400">Configuración guardada correctamente.</p>
+          <p className="text-sm text-green-400">Configuration saved successfully.</p>
         </div>
       )}
 
@@ -159,19 +159,19 @@ export default function AdminSettings() {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm text-white font-medium">{setting.label}</span>
                       {setting.is_secret && (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 uppercase tracking-wider">Secreto</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 uppercase tracking-wider">Secret</span>
                       )}
                       {setting.value && setting.value.trim() !== '' ? (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">Configurado</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400">Configured</span>
                       ) : (
-                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400">Falta</span>
+                        <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400">Missing</span>
                       )}
                     </div>
                     <p className="text-xs text-[#A3A3A3] font-mono">{setting.key}</p>
                     <p className="text-xs text-[#A3A3A3] mt-1 font-mono truncate">
                       {setting.is_secret && setting.value
                         ? `${setting.value.slice(0, 4)}${'•'.repeat(12)}${setting.value.slice(-4)}`
-                        : setting.value || 'Sin configurar'}
+                        : setting.value || 'Not configured'}
                     </p>
                   </div>
                   <Form method="post" className="flex items-center gap-2 flex-shrink-0">
@@ -181,7 +181,7 @@ export default function AdminSettings() {
                       name="value"
                       type={setting.is_secret ? 'password' : 'text'}
                       defaultValue={setting.value || ''}
-                      placeholder={setting.is_secret ? '••••••••' : 'Valor'}
+                      placeholder={setting.is_secret ? '•••••••••' : 'Value'}
                       className="rounded-lg bg-[#1E1E1E] border border-[#2F2F2F] px-3 py-1.5 text-white text-xs font-mono focus:border-[#9E7FFF] focus:outline-none w-48"
                     />
                     <button
@@ -189,7 +189,7 @@ export default function AdminSettings() {
                       disabled={isSubmitting}
                       className="rounded-lg bg-[#9E7FFF] text-white text-xs font-medium px-3 py-1.5 hover:bg-[#8B6EE6] transition-colors disabled:opacity-50"
                     >
-                      Guardar
+                      Save
                     </button>
                   </Form>
                 </div>

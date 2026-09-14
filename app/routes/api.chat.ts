@@ -7,26 +7,26 @@ import type { ChatMessage } from '~/lib/types';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL_ID = 'deepseek/deepseek-v4-pro-0813';
 
-const SYSTEM_PROMPT = `Eres un generador de proyectos web. Cuando el usuario te pida crear o modificar un proyecto, respondes con archivos completos usando bloques de codigo con la ruta del archivo.
+const SYSTEM_PROMPT = `You are a web project generator. When the user asks you to create or modify a project, respond with complete files using code blocks with the file path.
 
-Formato obligatorio para cada archivo:
+Required format for each file:
 
 \`\`\`tsx filepath:src/App.tsx
 import React from 'react';
 
 export default function App() {
-  return <div>Hola Mundo</div>;
+  return <div>Hello World</div>;
 }
 \`\`\`
 
-Reglas:
-- Cada bloque de codigo debe empezar con el lenguaje seguido de "filepath:" y la ruta del archivo
-- Incluye TODOS los archivos necesarios para que el proyecto funcione
-- Usa rutas relativas desde la raiz del proyecto (ej: src/App.tsx, package.json, vite.config.ts)
-- No abrevies el codigo ni uses comentarios como "// resto del codigo"
-- Escribe cada archivo completo, listo para usar
-- Despues de los bloques de codigo, puedes incluir una breve explicacion del proyecto
-- Si el usuario pide modificar un archivo existente, envia el archivo completo con los cambios aplicados`;
+Rules:
+- Each code block must start with the language followed by "filepath:" and the file path
+- Include ALL files needed for the project to work
+- Use relative paths from the project root (e.g.: src/App.tsx, package.json, vite.config.ts)
+- Do not abbreviate code or use comments like "// rest of the code"
+- Write each file completely, ready to use
+- After the code blocks, you can include a brief explanation of the project
+- If the user asks to modify an existing file, send the complete file with the changes applied`;
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
@@ -40,20 +40,20 @@ export async function action({ request }: ActionFunctionArgs) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return Response.json({ error: 'No autenticado' }, { status: 401, headers });
+    return Response.json({ error: 'Not authenticated' }, { status: 401, headers });
   }
 
   let body: { projectId?: string; messages?: ChatMessage[]; modelId?: string };
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: 'Cuerpo de la peticion invalido' }, { status: 400, headers });
+    return Response.json({ error: 'Invalid request body' }, { status: 400, headers });
   }
 
   const { projectId, messages, modelId } = body;
 
   if (!projectId || !messages || !Array.isArray(messages) || messages.length === 0) {
-    return Response.json({ error: 'Faltan parametros requeridos' }, { status: 400, headers });
+    return Response.json({ error: 'Missing required parameters' }, { status: 400, headers });
   }
 
   // Verify project belongs to the authenticated user
@@ -65,7 +65,7 @@ export async function action({ request }: ActionFunctionArgs) {
     .maybeSingle();
 
   if (projectError || !project) {
-    return Response.json({ error: 'Proyecto no encontrado' }, { status: 404, headers });
+    return Response.json({ error: 'Project not found' }, { status: 404, headers });
   }
 
   // Fetch current token balance and preferred model
@@ -76,7 +76,7 @@ export async function action({ request }: ActionFunctionArgs) {
     .maybeSingle();
 
   if (profileError || !profile) {
-    return Response.json({ error: 'Perfil no encontrado' }, { status: 404, headers });
+    return Response.json({ error: 'Profile not found' }, { status: 404, headers });
   }
 
   const tokenBalance = profile.token_balance;
@@ -110,7 +110,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (estimatedTotal > tokenBalance) {
     return Response.json(
-      { error: 'No tienes suficientes tokens para enviar este mensaje.', tokenBalance },
+      { error: 'You do not have enough tokens to send this message.', tokenBalance },
       { status: 402, headers }
     );
   }
@@ -121,7 +121,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const apiKey = await getSetting('openrouter_api_key');
   if (!apiKey) {
     return Response.json(
-      { error: 'El servicio de IA no esta configurado. Configura la API key de OpenRouter en el panel de administración.' },
+      { error: 'AI service is not configured. Set the OpenRouter API key in the admin panel.' },
       { status: 503, headers }
     );
   }
@@ -166,7 +166,7 @@ export async function action({ request }: ActionFunctionArgs) {
             }),
           });
         } catch {
-          send({ type: 'error', error: 'Error al contactar el servicio de IA.' });
+          send({ type: 'error', error: 'Error contacting AI service.' });
           controller.close();
           return;
         }
@@ -174,14 +174,14 @@ export async function action({ request }: ActionFunctionArgs) {
         if (!openrouterResponse.ok) {
           const errText = await openrouterResponse.text().catch(() => '');
           console.error('OpenRouter error:', openrouterResponse.status, errText);
-          send({ type: 'error', error: 'El servicio de IA devolvio un error.' });
+          send({ type: 'error', error: 'AI service returned an error.' });
           controller.close();
           return;
         }
 
         const reader = openrouterResponse.body?.getReader();
         if (!reader) {
-          send({ type: 'error', error: 'No se pudo leer el stream.' });
+          send({ type: 'error', error: 'Could not read stream.' });
           controller.close();
           return;
         }
@@ -217,7 +217,7 @@ export async function action({ request }: ActionFunctionArgs) {
         }
 
         // Process the complete response
-        const assistantContent = fullContent || 'No se pudo generar una respuesta.';
+        const assistantContent = fullContent || 'Could not generate a response.';
 
         const parsedFiles = parseGeneratedFiles(assistantContent);
         const displayContent = parsedFiles.length > 0
@@ -237,7 +237,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
         if (deductError) {
           console.error('Token deduction failed:', deductError);
-          send({ type: 'error', error: 'Error al descontar tokens.' });
+          send({ type: 'error', error: 'Error deducting tokens.' });
           controller.close();
           return;
         }
@@ -313,7 +313,7 @@ export async function action({ request }: ActionFunctionArgs) {
         });
       } catch (err) {
         console.error('Stream error:', err);
-        send({ type: 'error', error: 'Error inesperado en el servidor.' });
+        send({ type: 'error', error: 'Unexpected server error.' });
       } finally {
         controller.close();
       }

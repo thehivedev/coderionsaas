@@ -7,7 +7,7 @@ import AdminLayout from '~/components/admin/AdminLayout';
 import { useState } from 'react';
 
 export const meta: MetaFunction = () => [
-  { title: `${APP_NAME} - Admin · Usuarios` },
+  { title: `${APP_NAME} - Admin · Users` },
 ];
 
 interface AdminUser {
@@ -72,7 +72,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const userId = String(formData.get('userId') || '');
 
   if (!userId) {
-    return Response.json({ error: 'Falta el usuario' }, { status: 400, headers: result.headers });
+    return Response.json({ error: 'Missing user' }, { status: 400, headers: result.headers });
   }
 
   const serviceClient = createSupabaseServiceClient();
@@ -97,7 +97,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const amount = parseInt(String(formData.get('amount') || '0'), 10);
 
     if (!amount || amount <= 0) {
-      return Response.json({ error: 'Cantidad inválida' }, { status: 400, headers: result.headers });
+      return Response.json({ error: 'Invalid amount' }, { status: 400, headers: result.headers });
     }
 
     const { data: profile } = await serviceClient
@@ -107,7 +107,7 @@ export async function action({ request }: ActionFunctionArgs) {
       .maybeSingle();
 
     if (!profile) {
-      return Response.json({ error: 'Usuario no encontrado' }, { status: 404, headers: result.headers });
+      return Response.json({ error: 'User not found' }, { status: 404, headers: result.headers });
     }
 
     const newBalance = (profile.token_balance || 0) + amount;
@@ -128,7 +128,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const amount = parseInt(String(formData.get('amount') || '0'), 10);
 
     if (amount < 0) {
-      return Response.json({ error: 'Cantidad inválida' }, { status: 400, headers: result.headers });
+      return Response.json({ error: 'Invalid amount' }, { status: 400, headers: result.headers });
     }
 
     const { error } = await serviceClient
@@ -143,7 +143,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({ success: true }, { headers: result.headers });
   }
 
-  return Response.json({ error: 'Acción no reconocida' }, { status: 400, headers: result.headers });
+  return Response.json({ error: 'Unrecognized action' }, { status: 400, headers: result.headers });
 }
 
 export default function AdminUsers() {
@@ -156,8 +156,8 @@ export default function AdminUsers() {
   return (
     <AdminLayout adminEmail={data.adminEmail}>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">Usuarios</h1>
-        <p className="text-sm text-[#A3A3A3] mt-1">{data.users.length} usuarios registrados.</p>
+        <h1 className="text-2xl font-bold text-white">Users</h1>
+        <p className="text-sm text-[#A3A3A3] mt-1">{data.users.length} registered users.</p>
       </div>
 
       {actionData?.error && (
@@ -167,7 +167,7 @@ export default function AdminUsers() {
       )}
       {actionData?.success && (
         <div className="mb-4 rounded-lg bg-green-500/10 border border-green-500/30 p-3">
-          <p className="text-sm text-green-400">Operación completada.</p>
+          <p className="text-sm text-green-400">Operation completed.</p>
         </div>
       )}
 
@@ -175,18 +175,18 @@ export default function AdminUsers() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#2F2F2F]">
-              <th className="text-left text-xs font-medium text-[#A3A3A3] px-5 py-3">Usuario</th>
+              <th className="text-left text-xs font-medium text-[#A3A3A3] px-5 py-3">User</th>
               <th className="text-right text-xs font-medium text-[#A3A3A3] px-5 py-3">Tokens</th>
-              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Proyectos</th>
-              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Registrado</th>
-              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Rol</th>
-              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Acciones</th>
+              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Projects</th>
+              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Registered</th>
+              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Role</th>
+              <th className="text-center text-xs font-medium text-[#A3A3A3] px-5 py-3">Actions</th>
             </tr>
           </thead>
           <tbody>
             {data.users.length === 0 ? (
               <tr>
-                <td colSpan={6} className="text-center text-sm text-[#A3A3A3] py-8">No hay usuarios.</td>
+                <td colSpan={6} className="text-center text-sm text-[#A3A3A3] py-8">No users.</td>
               </tr>
             ) : (
               data.users.map((user) => (
@@ -204,7 +204,7 @@ export default function AdminUsers() {
                     <span className="text-sm text-[#A3A3A3]">{user.projectCount}</span>
                   </td>
                   <td className="px-5 py-3 text-center">
-                    <span className="text-xs text-[#A3A3A3]">{new Date(user.created_at).toLocaleDateString('es-ES', { day: 'numeric', month: 'short' })}</span>
+                    <span className="text-xs text-[#A3A3A3]">{new Date(user.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</span>
                   </td>
                   <td className="px-5 py-3 text-center">
                     <Form method="post" className="inline">
@@ -220,7 +220,7 @@ export default function AdminUsers() {
                             : 'bg-[#3F3F3F] text-[#A3A3A3] hover:bg-[#4F4F4F]'
                         }`}
                       >
-                        {user.is_admin ? 'Admin' : 'Usuario'}
+                        {user.is_admin ? 'Admin' : 'User'}
                       </button>
                     </Form>
                   </td>
@@ -229,14 +229,14 @@ export default function AdminUsers() {
                       <button
                         onClick={() => setTokenModal({ userId: user.id, email: user.email, mode: 'add' })}
                         className="text-xs px-2 py-1 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors"
-                        title="Añadir tokens"
+                        title="Add tokens"
                       >
                         + Tokens
                       </button>
                       <button
                         onClick={() => setTokenModal({ userId: user.id, email: user.email, mode: 'set' })}
                         className="text-xs px-2 py-1 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors"
-                        title="Establecer tokens"
+                        title="Set tokens"
                       >
                         Set
                       </button>
@@ -254,7 +254,7 @@ export default function AdminUsers() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setTokenModal(null)}>
           <div className="rounded-2xl bg-[#262626] ring-1 ring-[#2F2F2F] p-6 w-full max-w-md mx-4" onClick={(e) => e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-white mb-2">
-              {tokenModal.mode === 'add' ? 'Añadir tokens' : 'Establecer tokens'}
+              {tokenModal.mode === 'add' ? 'Add tokens' : 'Set tokens'}
             </h3>
             <p className="text-sm text-[#A3A3A3] mb-4">{tokenModal.email}</p>
             <Form method="post" className="space-y-4">
@@ -262,7 +262,7 @@ export default function AdminUsers() {
               <input type="hidden" name="userId" value={tokenModal.userId} />
               <div>
                 <label className="block text-xs font-medium text-[#A3A3A3] mb-1.5">
-                  {tokenModal.mode === 'add' ? 'Cantidad a añadir' : 'Nuevo balance total'}
+                  {tokenModal.mode === 'add' ? 'Amount to add' : 'New total balance'}
                 </label>
                 <input
                   name="amount"
@@ -280,14 +280,14 @@ export default function AdminUsers() {
                   disabled={isSubmitting}
                   className="bg-[#9E7FFF] text-white font-semibold rounded-lg px-4 py-2 text-sm hover:bg-[#8B6EE6] transition-colors disabled:opacity-50"
                 >
-                  {isSubmitting ? 'Guardando...' : 'Confirmar'}
+                  {isSubmitting ? 'Saving...' : 'Confirm'}
                 </button>
                 <button
                   type="button"
                   onClick={() => setTokenModal(null)}
                   className="text-[#A3A3A3] hover:text-white text-sm transition-colors"
                 >
-                  Cancelar
+                  Cancel
                 </button>
               </div>
             </Form>

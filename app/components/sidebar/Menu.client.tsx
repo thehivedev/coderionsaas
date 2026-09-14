@@ -100,7 +100,7 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
               <button
                 onClick={() => setIsSidebarOpen(false)}
                 className="lg:hidden text-[#A3A3A3] hover:text-white p-2 rounded-lg hover:bg-[#2F2F2F] transition-colors"
-                aria-label="Cerrar menu"
+                aria-label="Close menu"
               >
                 <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -124,7 +124,7 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
                 </svg>
               )}
-              Nuevo proyecto
+              New project
             </button>
           </div>
 
@@ -142,7 +142,7 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
                 <svg className="w-12 h-12 text-[#3F3F3F] mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                 </svg>
-                <p className="text-sm text-[#A3A3A3]">No hay proyectos todavia</p>
+                <p className="text-sm text-[#A3A3A3]">No projects yet</p>
               </div>
             ) : (
               <ul className="space-y-1">
@@ -163,7 +163,7 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
                       <button
                         onClick={(e) => handleDeleteProject(project.id, e)}
                         className="opacity-0 group-hover:opacity-100 text-[#A3A3A3] hover:text-red-400 p-1 rounded transition-all"
-                        aria-label="Eliminar proyecto"
+                        aria-label="Delete project"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -215,7 +215,7 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
                 <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
               </svg>
-              Panel de administración
+              Admin panel
             </a>
 
             <button
@@ -223,7 +223,7 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
               disabled={isRedirecting}
               className="w-full flex items-center justify-center gap-2 text-sm text-[#9E7FFF] hover:text-white transition-colors bg-[#9E7FFF]/10 border border-[#9E7FFF]/30 rounded-lg px-4 py-2.5 hover:bg-[#9E7FFF]/20 focus:outline-none focus:ring-2 focus:ring-[#9E7FFF]/40 disabled:opacity-50 mb-2"
             >
-              {isRedirecting ? 'Redirigiendo...' : 'Comprar tokens'}
+              {isRedirecting ? 'Redirecting...' : 'Buy tokens'}
             </button>
 
             <Form method="post" action="/auth/logout">
@@ -234,7 +234,7 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                   <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
                 </svg>
-                Cerrar sesion
+                Log out
               </button>
             </Form>
           </div>
@@ -245,7 +245,7 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
       <button
         onClick={() => setIsSidebarOpen(true)}
         className="fixed top-4 left-4 z-10 lg:hidden bg-[#262626] border border-[#2F2F2F] rounded-lg p-2 text-white hover:bg-[#2F2F2F] transition-colors"
-        aria-label="Abrir menu"
+        aria-label="Open menu"
       >
         <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />

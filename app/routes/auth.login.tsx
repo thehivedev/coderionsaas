@@ -6,8 +6,8 @@ import { APP_NAME } from '~/lib/constants';
 
 export const meta: MetaFunction = () => {
   return [
-    { title: `Iniciar sesión | ${APP_NAME}` },
-    { name: 'description', content: 'Accede a tu cuenta de Coderion para continuar construyendo con IA.' },
+    { title: `Log in | ${APP_NAME}` },
+    { name: 'description', content: 'Access your Coderion account to continue building with AI.' },
   ];
 };
 
@@ -99,8 +99,8 @@ export default function LoginRoute() {
             </svg>
             <span className="text-2xl font-bold text-white tracking-tight">{APP_NAME}</span>
           </Link>
-          <h1 className="mt-6 text-3xl font-bold text-white tracking-tight">Bienvenido de nuevo</h1>
-          <p className="mt-2 text-sm text-[#A3A3A3]">Inicia sesión para continuar construyendo</p>
+          <h1 className="mt-6 text-3xl font-bold text-white tracking-tight">Welcome back</h1>
+          <p className="mt-2 text-sm text-[#A3A3A3]">Log in to continue building</p>
         </div>
 
         <div className="bg-[#262626] rounded-2xl p-8 shadow-xl ring-1 ring-[#2F2F2F]">
@@ -115,7 +115,7 @@ export default function LoginRoute() {
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-[#A3A3A3] mb-1.5">
-                Correo electrónico
+                Email
               </label>
               <input
                 ref={emailRef}
@@ -126,14 +126,14 @@ export default function LoginRoute() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="tu@ejemplo.com"
+                placeholder="you@example.com"
                 className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-4 py-2.5 text-white placeholder-[#A3A3A3] focus:border-[#9E7FFF] focus:ring-2 focus:ring-[#9E7FFF]/20 focus:outline-none transition-colors"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-[#A3A3A3] mb-1.5">
-                Contraseña
+                Password
               </label>
               <input
                 id="password"
@@ -153,20 +153,20 @@ export default function LoginRoute() {
               disabled={isSubmitting}
               className="w-full rounded-lg bg-[#9E7FFF] py-2.5 px-4 text-white font-semibold hover:bg-[#8B6EE6] focus:outline-none focus:ring-2 focus:ring-[#9E7FFF]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
-              {isSubmitting ? 'Iniciando sesión...' : 'Iniciar sesión'}
+              {isSubmitting ? 'Logging in...' : 'Log in'}
             </button>
           </Form>
         </div>
 
         <p className="mt-6 text-center text-sm text-[#A3A3A3]">
-          ¿No tienes una cuenta?{' '}
+          Don't have an account?{' '}
           <Link to={`/auth/register?redirectTo=${encodeURIComponent(redirectTo)}`} className="font-semibold text-[#9E7FFF] hover:text-[#B39DFF] transition-colors">
-            Crear cuenta
+            Create account
           </Link>
         </p>
         <p className="mt-2 text-center text-sm text-[#A3A3A3]">
           <Link to="/" className="text-[#A3A3A3] hover:text-white transition-colors">
-            ← Volver al inicio
+            ← Back to home
           </Link>
         </p>
       </div>

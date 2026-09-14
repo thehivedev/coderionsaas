@@ -4,9 +4,9 @@ import { createSupabaseServerClient } from '~/lib/supabaseServer';
 import { getSetting } from '~/lib/settings.server';
 
 const TOKEN_PACKAGES = {
-  basic: { name: 'Básico', tokens: 500_000, price: 10, settingKey: 'stripe_price_basic' },
+  basic: { name: 'Basic', tokens: 500_000, price: 10, settingKey: 'stripe_price_basic' },
   pro: { name: 'Pro', tokens: 2_000_000, price: 25, settingKey: 'stripe_price_pro' },
-  enterprise: { name: 'Empresarial', tokens: 10_000_000, price: 99, settingKey: 'stripe_price_enterprise' },
+  enterprise: { name: 'Enterprise', tokens: 10_000_000, price: 99, settingKey: 'stripe_price_enterprise' },
 } as const;
 
 type TokenPackageKey = keyof typeof TOKEN_PACKAGES;
@@ -23,20 +23,20 @@ export async function action({ request }: ActionFunctionArgs) {
   } = await supabase.auth.getUser();
 
   if (!user || !user.email) {
-    return Response.json({ error: 'No autenticado' }, { status: 401, headers });
+    return Response.json({ error: 'Not authenticated' }, { status: 401, headers });
   }
 
   let body: { package?: string };
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: 'Cuerpo de la petición inválido' }, { status: 400, headers });
+    return Response.json({ error: 'Invalid request body' }, { status: 400, headers });
   }
 
   const packageKey = body.package as TokenPackageKey | undefined;
 
   if (!packageKey || !(packageKey in TOKEN_PACKAGES)) {
-    return Response.json({ error: 'Paquete inválido' }, { status: 400, headers });
+    return Response.json({ error: 'Invalid package' }, { status: 400, headers });
   }
 
   const pkg = TOKEN_PACKAGES[packageKey];
@@ -44,7 +44,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (!priceId) {
     return Response.json(
-      { error: 'Este paquete no está configurado. Configúralo en el panel de administración.' },
+      { error: 'This package is not configured. Configure it in the admin panel.' },
       { status: 503, headers }
     );
   }
@@ -52,7 +52,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const stripeSecretKey = await getSetting('stripe_secret_key');
   if (!stripeSecretKey) {
     return Response.json(
-      { error: 'Stripe no está configurado. Configúralo en el panel de administración.' },
+      { error: 'Stripe is not configured. Configure it in the admin panel.' },
       { status: 503, headers }
     );
   }
@@ -76,7 +76,7 @@ export async function action({ request }: ActionFunctionArgs) {
     });
   } catch (err) {
     console.error('Stripe checkout session creation failed:', err);
-    return Response.json({ error: 'No se pudo crear la sesión de pago.' }, { status: 502, headers });
+    return Response.json({ error: 'Could not create payment session.' }, { status: 502, headers });
   }
 
   return Response.json({ url: session.url }, { headers });

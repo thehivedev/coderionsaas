@@ -24,13 +24,13 @@ export async function action({ request }: ActionFunctionArgs) {
   } = await supabase.auth.getUser();
 
   if (!user) {
-    return Response.json({ error: 'No autenticado' }, { status: 401, headers });
+    return Response.json({ error: 'Not authenticated' }, { status: 401, headers });
   }
 
   const clientId = await getSetting('github_client_id');
   if (!clientId) {
     return Response.json(
-      { error: 'GitHub OAuth no esta configurado. Configura las credenciales en el panel de administración.' },
+      { error: 'GitHub OAuth is not configured. Set the credentials in the admin panel.' },
       { status: 503, headers }
     );
   }

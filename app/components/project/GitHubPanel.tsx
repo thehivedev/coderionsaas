@@ -56,7 +56,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
         window.location.href = data.authUrl;
       }
     } catch {
-      setError('Error al conectar con GitHub');
+      setError('Error connecting to GitHub');
     }
   }
 
@@ -87,16 +87,16 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Error al importar');
+        setError(data.error || 'Import error');
         return;
       }
 
-      setSuccess(`Importados ${data.imported} archivos de ${data.repo} (rama: ${data.branch})`);
+      setSuccess(`Imported ${data.imported} files from ${data.repo} (branch: ${data.branch})`);
       setShowImport(false);
       setRepoUrl('');
       onImported?.();
     } catch {
-      setError('Error de conexion');
+      setError('Connection error');
     } finally {
       setBusy(false);
     }
@@ -127,13 +127,13 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || 'Error al subir');
+        setError(data.error || 'Push error');
         return;
       }
 
-      let msg = `Subidos ${data.filesPushed} archivos a ${data.repo} (rama: ${data.branch})`;
+      let msg = `Pushed ${data.filesPushed} files to ${data.repo} (branch: ${data.branch})`;
       if (data.prUrl) {
-        msg += ` — Pull Request creado: ${data.prUrl}`;
+        msg += ` — Pull Request created: ${data.prUrl}`;
       }
       setSuccess(msg);
       setShowPush(false);
@@ -143,7 +143,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
       setCommitMessage('');
       setOpenPR(false);
     } catch {
-      setError('Error de conexion');
+      setError('Connection error');
     } finally {
       setBusy(false);
     }
@@ -170,7 +170,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
           <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" />
           </svg>
-          Conectar GitHub
+          Connect GitHub
         </button>
         {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
       </div>
@@ -198,7 +198,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
         <button
           onClick={handleDisconnect}
           className="text-xs text-[#A3A3A3] hover:text-red-400 transition-colors"
-          title="Desconectar"
+          title="Disconnect"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -214,7 +214,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
         </svg>
-        Importar desde GitHub
+        Import from GitHub
       </button>
 
       {showImport && (
@@ -223,7 +223,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
             type="text"
             value={repoUrl}
             onChange={(e) => setRepoUrl(e.target.value)}
-            placeholder="https://github.com/usuario/repo"
+            placeholder="https://github.com/user/repo"
             className="w-full bg-[#1E1E1E] text-white text-xs rounded-md px-3 py-2 border border-[#2F2F2F] focus:outline-none focus:border-[#9E7FFF]/50"
           />
           <button
@@ -231,7 +231,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
             disabled={!repoUrl.trim() || busy}
             className="w-full bg-[#9E7FFF] text-white text-xs font-medium rounded-md px-3 py-2 hover:bg-[#8B6EE6] transition-colors disabled:opacity-50"
           >
-            {busy ? 'Importando...' : 'Importar archivos'}
+            {busy ? 'Importing...' : 'Import files'}
           </button>
         </div>
       )}
@@ -244,29 +244,29 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M4 12l4 4 12-12M4 20h16" />
         </svg>
-        Push a GitHub
+        Push to GitHub
       </button>
 
       {showPush && (
         <div className="bg-[#262626] rounded-lg p-3 space-y-2 border border-[#2F2F2F]">
           <div className="space-y-1">
-            <label className="text-xs text-[#A3A3A3]">Repo existente (opcional)</label>
+            <label className="text-xs text-[#A3A3A3]">Existing repo (optional)</label>
             <input
               type="text"
               value={repoUrl}
               onChange={(e) => setRepoUrl(e.target.value)}
-              placeholder="https://github.com/usuario/repo"
+              placeholder="https://github.com/user/repo"
               className="w-full bg-[#1E1E1E] text-white text-xs rounded-md px-3 py-2 border border-[#2F2F2F] focus:outline-none focus:border-[#9E7FFF]/50"
             />
           </div>
 
           <div className="space-y-1">
-            <label className="text-xs text-[#A3A3A3]">O crear repo nuevo</label>
+            <label className="text-xs text-[#A3A3A3]">Or create new repo</label>
             <input
               type="text"
               value={newRepoName}
               onChange={(e) => setNewRepoName(e.target.value)}
-              placeholder="mi-proyecto"
+              placeholder="my-project"
               className="w-full bg-[#1E1E1E] text-white text-xs rounded-md px-3 py-2 border border-[#2F2F2F] focus:outline-none focus:border-[#9E7FFF]/50"
             />
           </div>
@@ -274,7 +274,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
           {repoUrl.trim() && (
             <>
               <div className="space-y-1">
-                <label className="text-xs text-[#A3A3A3]">Rama (default: main)</label>
+                <label className="text-xs text-[#A3A3A3]">Branch (default: main)</label>
                 <input
                   type="text"
                   value={branch}
@@ -284,12 +284,12 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
                 />
               </div>
               <div className="space-y-1">
-                <label className="text-xs text-[#A3A3A3]">Nueva rama (opcional)</label>
+                <label className="text-xs text-[#A3A3A3]">New branch (optional)</label>
                 <input
                   type="text"
                   value={newBranch}
                   onChange={(e) => setNewBranch(e.target.value)}
-                  placeholder="feature/mi-cambio"
+                  placeholder="feature/my-change"
                   className="w-full bg-[#1E1E1E] text-white text-xs rounded-md px-3 py-2 border border-[#2F2F2F] focus:outline-none focus:border-[#9E7FFF]/50"
                 />
               </div>
@@ -297,7 +297,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
           )}
 
           <div className="space-y-1">
-            <label className="text-xs text-[#A3A3A3]">Mensaje del commit</label>
+            <label className="text-xs text-[#A3A3A3]">Commit message</label>
             <input
               type="text"
               value={commitMessage}
@@ -315,7 +315,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
                 onChange={(e) => setOpenPR(e.target.checked)}
                 className="accent-[#9E7FFF]"
               />
-              Abrir Pull Request
+              Open Pull Request
             </label>
           )}
 
@@ -327,7 +327,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
                 onChange={(e) => setIsPrivate(e.target.checked)}
                 className="accent-[#9E7FFF]"
               />
-              Repo privado
+              Private repo
             </label>
           )}
 
@@ -336,7 +336,7 @@ export default function GitHubPanel({ projectId, onImported }: GitHubPanelProps)
             disabled={busy || (!repoUrl.trim() && !newRepoName.trim())}
             className="w-full bg-[#9E7FFF] text-white text-xs font-medium rounded-md px-3 py-2 hover:bg-[#8B6EE6] transition-colors disabled:opacity-50"
           >
-            {busy ? 'Subiendo...' : 'Subir archivos'}
+            {busy ? 'Pushing...' : 'Push files'}
           </button>
         </div>
       )}

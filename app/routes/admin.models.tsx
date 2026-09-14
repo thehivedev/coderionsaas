@@ -8,7 +8,7 @@ import AdminLayout from '~/components/admin/AdminLayout';
 import { useState } from 'react';
 
 export const meta: MetaFunction = () => [
-  { title: `${APP_NAME} - Admin · Modelos de IA` },
+  { title: `${APP_NAME} - Admin · AI Models` },
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -49,7 +49,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const sort_order = parseInt(String(formData.get('sort_order') || '0'), 10);
 
     if (!name || !model_id) {
-      return Response.json({ error: 'Nombre y model_id son obligatorios' }, { status: 400, headers: result.headers });
+      return Response.json({ error: 'Name and model_id are required' }, { status: 400, headers: result.headers });
     }
 
     const { error } = await serviceClient.from('ai_models').insert({
@@ -76,7 +76,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const value = String(formData.get('value') || '');
 
     if (!id || !field) {
-      return Response.json({ error: 'Faltan parámetros' }, { status: 400, headers: result.headers });
+      return Response.json({ error: 'Missing parameters' }, { status: 400, headers: result.headers });
     }
 
     let parsedValue: string | number | boolean = value;
@@ -107,7 +107,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({ success: true }, { headers: result.headers });
   }
 
-  return Response.json({ error: 'Acción no reconocida' }, { status: 400, headers: result.headers });
+  return Response.json({ error: 'Unrecognized action' }, { status: 400, headers: result.headers });
 }
 
 export default function AdminModelsRoute() {
@@ -120,9 +120,9 @@ export default function AdminModelsRoute() {
   return (
     <AdminLayout adminEmail={adminEmail}>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">Modelos de IA</h1>
+        <h1 className="text-2xl font-bold text-white">AI Models</h1>
         <p className="text-sm text-[#A3A3A3] mt-1">
-          Configura los modelos disponibles, precios y márgenes de ganancia.
+          Configure available models, prices, and profit margins.
         </p>
       </div>
 
@@ -133,7 +133,7 @@ export default function AdminModelsRoute() {
       )}
       {actionData?.success && (
         <div className="mb-4 rounded-lg bg-green-500/10 border border-green-500/30 p-3">
-          <p className="text-sm text-green-400">Operación completada.</p>
+          <p className="text-sm text-green-400">Operation completed.</p>
         </div>
       )}
 
@@ -141,12 +141,12 @@ export default function AdminModelsRoute() {
         <table className="w-full">
           <thead>
             <tr className="border-b border-[#2F2F2F]">
-              <th className="text-left text-xs font-medium text-[#A3A3A3] px-4 py-3">Nombre</th>
+              <th className="text-left text-xs font-medium text-[#A3A3A3] px-4 py-3">Name</th>
               <th className="text-left text-xs font-medium text-[#A3A3A3] px-4 py-3">Model ID</th>
               <th className="text-right text-xs font-medium text-[#A3A3A3] px-4 py-3">Markup</th>
               <th className="text-right text-xs font-medium text-[#A3A3A3] px-4 py-3">Cost Mult.</th>
-              <th className="text-center text-xs font-medium text-[#A3A3A3] px-4 py-3">Activo</th>
-              <th className="text-center text-xs font-medium text-[#A3A3A3] px-4 py-3">Orden</th>
+              <th className="text-center text-xs font-medium text-[#A3A3A3] px-4 py-3">Active</th>
+              <th className="text-center text-xs font-medium text-[#A3A3A3] px-4 py-3">Order</th>
               <th className="text-center text-xs font-medium text-[#A3A3A3] px-4 py-3"></th>
             </tr>
           </thead>
@@ -154,7 +154,7 @@ export default function AdminModelsRoute() {
             {models.length === 0 ? (
               <tr>
                 <td colSpan={7} className="text-center text-sm text-[#A3A3A3] py-8">
-                  No hay modelos configurados.
+                  No models configured.
                 </td>
               </tr>
             ) : (
@@ -194,7 +194,7 @@ export default function AdminModelsRoute() {
                             : 'bg-[#3F3F3F] text-[#A3A3A3] hover:bg-[#4F4F4F]'
                         }`}
                       >
-                        {model.is_active ? 'Activo' : 'Inactivo'}
+                        {model.is_active ? 'Active' : 'Inactive'}
                       </button>
                     </form>
                   </td>
@@ -203,7 +203,7 @@ export default function AdminModelsRoute() {
                   </td>
                   <td className="px-4 py-3 text-center">
                     <form method="post" className="inline"
-                      onSubmit={(e) => { if (!confirm('¿Eliminar este modelo?')) e.preventDefault(); }}
+                      onSubmit={(e) => { if (!confirm('Delete this model?')) e.preventDefault(); }}
                     >
                       <input type="hidden" name="intent" value="delete" />
                       <input type="hidden" name="id" value={model.id} />
@@ -211,7 +211,7 @@ export default function AdminModelsRoute() {
                         type="submit"
                         disabled={isSubmitting}
                         className="text-[#A3A3A3] hover:text-red-400 transition-colors p-1"
-                        aria-label="Eliminar"
+                        aria-label="Delete"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -228,12 +228,12 @@ export default function AdminModelsRoute() {
 
       {showForm ? (
         <div className="bg-[#262626] rounded-2xl ring-1 ring-[#2F2F2F] p-6">
-          <h2 className="text-lg font-semibold text-white mb-4">Nuevo modelo</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">New model</h2>
           <Form method="post" className="space-y-4">
             <input type="hidden" name="intent" value="create" />
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Nombre</label>
+                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Name</label>
                 <input name="name" required placeholder="Claude 3.5 Sonnet" className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" />
               </div>
               <div>
@@ -245,36 +245,36 @@ export default function AdminModelsRoute() {
                 <input name="provider" defaultValue="openrouter" className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Badge (opcional)</label>
-                <input name="badge" placeholder="Premium / Económico" className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" />
+                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Badge (optional)</label>
+                <input name="badge" placeholder="Premium / Budget" className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Precio input / token (USD)</label>
+                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Input price / token (USD)</label>
                 <input name="input_price_per_token" type="number" step="0.00000001" defaultValue="0" className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Precio output / token (USD)</label>
+                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Output price / token (USD)</label>
                 <input name="output_price_per_token" type="number" step="0.00000001" defaultValue="0" className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Markup (1.5 = 50% ganancia)</label>
+                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Markup (1.5 = 50% profit)</label>
                 <input name="markup_multiplier" type="number" step="0.1" defaultValue="1.0" className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Multiplicador de tokens (2.0 = cobra 2x tokens)</label>
+                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Token multiplier (2.0 = charges 2x tokens)</label>
                 <input name="token_cost_multiplier" type="number" step="0.1" defaultValue="1.0" className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" />
               </div>
               <div>
-                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Orden</label>
+                <label className="block text-xs font-medium text-[#A3A3A3] mb-1">Order</label>
                 <input name="sort_order" type="number" defaultValue="0" className="w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" />
               </div>
             </div>
             <div className="flex items-center gap-3">
               <button type="submit" disabled={isSubmitting} className="bg-[#9E7FFF] text-white font-semibold rounded-lg px-4 py-2 text-sm hover:bg-[#8B6EE6] transition-colors disabled:opacity-50">
-                {isSubmitting ? 'Guardando...' : 'Crear modelo'}
+                {isSubmitting ? 'Saving...' : 'Create model'}
               </button>
               <button type="button" onClick={() => setShowForm(false)} className="text-[#A3A3A3] hover:text-white text-sm transition-colors">
-                Cancelar
+                Cancel
               </button>
             </div>
           </Form>
@@ -284,7 +284,7 @@ export default function AdminModelsRoute() {
           <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
           </svg>
-          Agregar modelo
+          Add model
         </button>
       )}
     </AdminLayout>

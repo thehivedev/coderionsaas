@@ -207,7 +207,7 @@ function TreeItem({
           onDeleteFile(node.file!.id);
         }}
         className="opacity-0 group-hover:opacity-100 text-[#A3A3A3] hover:text-red-400 transition-all"
-        aria-label="Eliminar archivo"
+        aria-label="Delete file"
       >
         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -226,7 +226,7 @@ export default function FileTree({ files, selectedFile, onSelectFile, onDeleteFi
         <svg className="w-10 h-10 text-[#3F3F3F] mx-auto mb-2" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
           <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
         </svg>
-        <p className="text-xs text-[#A3A3A3]">No hay archivos generados</p>
+        <p className="text-xs text-[#A3A3A3]">No files generated</p>
       </div>
     );
   }

@@ -51,7 +51,7 @@ export async function createChat(userId: string): Promise<Chat | null> {
     .from('chats')
     .insert({
       user_id: userId,
-      title: 'Nuevo chat',
+      title: 'New chat',
       messages: [],
     })
     .select()
@@ -114,7 +114,7 @@ export async function createProject(userId: string): Promise<Project | null> {
     .from('projects')
     .insert({
       user_id: userId,
-      title: 'Nuevo proyecto',
+      title: 'New project',
       messages: [],
     })
     .select()

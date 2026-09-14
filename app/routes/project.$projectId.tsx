@@ -7,7 +7,7 @@ import MenuClient from '~/components/sidebar/Menu.client';
 import ProjectWorkspace from '~/components/project/ProjectWorkspace.client';
 
 export const meta: MetaFunction = () => [
-  { title: `${APP_NAME} - Proyecto` },
+  { title: `${APP_NAME} - Project` },
 ];
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
