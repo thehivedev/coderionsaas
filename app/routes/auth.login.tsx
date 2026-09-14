@@ -1,7 +1,7 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
-import { Form, Link, useActionData, useNavigation, useSearchParams } from '@remix-run/react';
+import type { MetaFunction } from '@remix-run/node';
+import { Link, useSearchParams } from '@remix-run/react';
 import { useEffect, useRef, useState } from 'react';
-import { createSupabaseServerClient } from '~/lib/supabaseServer';
+import { supabase } from '~/lib/supabaseClient';
 import { APP_NAME } from '~/lib/constants';
 
 export const meta: MetaFunction = () => {
@@ -11,55 +11,7 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const { supabase, headers } = createSupabaseServerClient(request);
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (user) {
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: '/',
-        ...headers,
-      },
-    });
-  }
-
-  return new Response(null, { headers });
-}
-
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  const email = String(formData.get('email') || '');
-  const password = String(formData.get('password') || '');
-  const redirectTo = String(formData.get('redirectTo') || '/');
-
-  const { supabase, headers } = createSupabaseServerClient(request);
-
-  const { error } = await supabase.auth.signInWithPassword({
-    email,
-    password,
-  });
-
-  if (error) {
-    return Response.json(
-      { error: error.message },
-      { status: 400, headers }
-    );
-  }
-
-  return Response.json(
-    { success: true, redirectTo },
-    { status: 200, headers }
-  );
-}
-
 export default function LoginRoute() {
-  const actionData = useActionData<{ error?: string; success?: boolean; redirectTo?: string }>();
-  const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
   const initialPrompt = searchParams.get('prompt') || '';
@@ -69,27 +21,37 @@ export default function LoginRoute() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
-
-  const isSubmitting = navigation.state === 'submitting';
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (actionData?.error) {
-      setError(actionData.error);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) window.location.href = redirectTo;
+    });
+  }, [redirectTo]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+
+    if (signInError) {
+      setError(signInError.message);
+      setIsSubmitting(false);
+      return;
     }
 
-    if (actionData?.success) {
-      const dest = actionData.redirectTo || redirectTo;
-      const typeParam = projectType ? `&type=${encodeURIComponent(projectType)}` : '';
-      const planParam = planMode ? '&plan=true' : '';
-      window.location.href = initialPrompt
-        ? `${dest}${dest.includes('?') ? '&' : '?'}prompt=${encodeURIComponent(initialPrompt)}${typeParam}${planParam}`
-        : `${dest}${typeParam}${planParam}`;
-    }
-  }, [actionData, redirectTo, initialPrompt]);
+    const dest = redirectTo;
+    const typeParam = projectType ? `&type=${encodeURIComponent(projectType)}` : '';
+    const planParam = planMode ? '&plan=true' : '';
+    window.location.href = initialPrompt
+      ? `${dest}${dest.includes('?') ? '&' : '?'}prompt=${encodeURIComponent(initialPrompt)}${typeParam}${planParam}`
+      : `${dest}${typeParam}${planParam}`;
+  }
 
   return (
     <div className="min-h-screen bg-[#171717] flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Decorative gradients */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#9E7FFF] opacity-10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#38bdf8] opacity-10 rounded-full blur-3xl animate-pulse" />
@@ -108,7 +70,7 @@ export default function LoginRoute() {
         </div>
 
         <div className="bg-[#262626] rounded-2xl p-8 shadow-xl ring-1 ring-[#2F2F2F]">
-          <Form method="post" className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <input type="hidden" name="redirectTo" value={redirectTo} />
 
             {error && (
@@ -159,7 +121,7 @@ export default function LoginRoute() {
             >
               {isSubmitting ? 'Logging in...' : 'Log in'}
             </button>
-          </Form>
+          </form>
         </div>
 
         <p className="mt-6 text-center text-sm text-[#A3A3A3]">

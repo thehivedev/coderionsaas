@@ -1,7 +1,6 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs, MetaFunction } from '@remix-run/node';
 import { useLoaderData, useActionData, useNavigation, Form } from '@remix-run/react';
-import { requireAdmin } from '~/lib/admin.server';
-import { createSupabaseServerClient, createSupabaseServiceClient } from '~/lib/supabaseServer';
+import { supabase } from '~/lib/supabaseClient';
 import { APP_NAME } from '~/lib/constants';
 import type { AIModel } from '~/lib/types';
 import AdminLayout from '~/components/admin/AdminLayout';
@@ -11,11 +10,11 @@ export const meta: MetaFunction = () => [
   { title: `${APP_NAME} - Admin · AI Models` },
 ];
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const result = await requireAdmin(request);
-  if ('redirect' in result) return result.redirect;
-
-  const { supabase } = createSupabaseServerClient(request);
+export async function loader() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: '/auth/login?redirectTo=/admin' } });
+  const { data: profile } = await supabase.from('profiles').select('id, email, is_admin').eq('id', user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: '/' } });
 
   const { data: models } = await supabase
     .from('ai_models')
@@ -23,19 +22,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     .order('sort_order', { ascending: true });
 
   return Response.json(
-    { adminEmail: result.admin.email, models: (models || []) as AIModel[] },
-    { headers: result.headers }
+    { adminEmail: profile.email, models: (models || []) as AIModel[] }
   );
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const result = await requireAdmin(request);
-  if ('redirect' in result) return result.redirect;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: '/auth/login?redirectTo=/admin' } });
+  const { data: profile } = await supabase.from('profiles').select('id, email, is_admin').eq('id', user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: '/' } });
 
   const formData = await request.formData();
   const intent = String(formData.get('intent') || '');
-
-  const serviceClient = createSupabaseServiceClient();
 
   if (intent === 'create') {
     const name = String(formData.get('name') || '');
@@ -49,10 +47,10 @@ export async function action({ request }: ActionFunctionArgs) {
     const sort_order = parseInt(String(formData.get('sort_order') || '0'), 10);
 
     if (!name || !model_id) {
-      return Response.json({ error: 'Name and model_id are required' }, { status: 400, headers: result.headers });
+      return Response.json({ error: 'Name and model_id are required' }, { status: 400 });
     }
 
-    const { error } = await serviceClient.from('ai_models').insert({
+    const { error } = await supabase.from('ai_models').insert({
       name, model_id, provider,
       input_price_per_token: input_price,
       output_price_per_token: output_price,
@@ -64,10 +62,10 @@ export async function action({ request }: ActionFunctionArgs) {
     });
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
 
-    return Response.json({ success: true }, { headers: result.headers });
+    return Response.json({ success: true });
   }
 
   if (intent === 'update') {
@@ -76,7 +74,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const value = String(formData.get('value') || '');
 
     if (!id || !field) {
-      return Response.json({ error: 'Missing parameters' }, { status: 400, headers: result.headers });
+      return Response.json({ error: 'Missing parameters' }, { status: 400 });
     }
 
     let parsedValue: string | number | boolean = value;
@@ -86,28 +84,28 @@ export async function action({ request }: ActionFunctionArgs) {
       parsedValue = parseFloat(value);
     }
 
-    const { error } = await serviceClient.from('ai_models').update({ [field]: parsedValue }).eq('id', id);
+    const { error } = await supabase.from('ai_models').update({ [field]: parsedValue }).eq('id', id);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
 
-    return Response.json({ success: true }, { headers: result.headers });
+    return Response.json({ success: true });
   }
 
   if (intent === 'delete') {
     const id = String(formData.get('id') || '');
 
-    const { error } = await serviceClient.from('ai_models').delete().eq('id', id);
+    const { error } = await supabase.from('ai_models').delete().eq('id', id);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
 
-    return Response.json({ success: true }, { headers: result.headers });
+    return Response.json({ success: true });
   }
 
-  return Response.json({ error: 'Unrecognized action' }, { status: 400, headers: result.headers });
+  return Response.json({ error: 'Unrecognized action' }, { status: 400 });
 }
 
 export default function AdminModelsRoute() {

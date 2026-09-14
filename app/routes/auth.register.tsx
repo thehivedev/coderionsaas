@@ -1,7 +1,7 @@
-import type { ActionFunctionArgs, LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
-import { Form, Link, useActionData, useNavigation, useSearchParams } from '@remix-run/react';
+import type { MetaFunction } from '@remix-run/node';
+import { Link, useSearchParams } from '@remix-run/react';
 import { useEffect, useRef, useState } from 'react';
-import { createSupabaseServerClient } from '~/lib/supabaseServer';
+import { supabase } from '~/lib/supabaseClient';
 import { APP_NAME } from '~/lib/constants';
 
 export const meta: MetaFunction = () => {
@@ -11,65 +11,7 @@ export const meta: MetaFunction = () => {
   ];
 };
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const { supabase, headers } = createSupabaseServerClient(request);
-
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (user) {
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: '/',
-        ...headers,
-      },
-    });
-  }
-
-  return new Response(null, { headers });
-}
-
-export async function action({ request }: ActionFunctionArgs) {
-  const formData = await request.formData();
-  const email = String(formData.get('email') || '');
-  const password = String(formData.get('password') || '');
-  const fullName = String(formData.get('fullName') || '');
-  const redirectTo = String(formData.get('redirectTo') || '/');
-
-  const { supabase, headers } = createSupabaseServerClient(request);
-
-  const { error } = await supabase.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName,
-      },
-    },
-  });
-
-  if (error) {
-    return Response.json(
-      { error: error.message },
-      { status: 400, headers }
-    );
-  }
-
-  return Response.json(
-    {
-      success: true,
-      message: 'Account created. You can now log in.',
-      redirectTo,
-    },
-    { status: 200, headers }
-  );
-}
-
 export default function RegisterRoute() {
-  const actionData = useActionData<{ error?: string; success?: boolean; message?: string; redirectTo?: string }>();
-  const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get('redirectTo') || '/';
   const initialPrompt = searchParams.get('prompt') || '';
@@ -81,31 +23,43 @@ export default function RegisterRoute() {
   const [fullName, setFullName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
-
-  const isSubmitting = navigation.state === 'submitting';
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (actionData?.error) {
-      setError(actionData.error);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) window.location.href = redirectTo;
+    });
+  }, [redirectTo]);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+    setIsSubmitting(true);
+
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } },
+    });
+
+    if (signUpError) {
+      setError(signUpError.message);
+      setIsSubmitting(false);
+      return;
     }
 
-    if (actionData?.success) {
-      setMessage(actionData.message || 'Account created successfully.');
-      const dest = actionData.redirectTo || redirectTo;
-      const typeParam = projectType ? `&type=${encodeURIComponent(projectType)}` : '';
-      const planParam = planMode ? '&plan=true' : '';
-      const loginUrl = initialPrompt
-        ? `/auth/login?redirectTo=${encodeURIComponent(dest)}&prompt=${encodeURIComponent(initialPrompt)}${typeParam}${planParam}`
-        : `/auth/login?redirectTo=${encodeURIComponent(dest)}${typeParam}${planParam}`;
-      setTimeout(() => {
-        window.location.href = loginUrl;
-      }, 2000);
-    }
-  }, [actionData, redirectTo, initialPrompt]);
+    setMessage('Account created. You can now log in.');
+    const typeParam = projectType ? `&type=${encodeURIComponent(projectType)}` : '';
+    const planParam = planMode ? '&plan=true' : '';
+    const loginUrl = initialPrompt
+      ? `/auth/login?redirectTo=${encodeURIComponent(redirectTo)}&prompt=${encodeURIComponent(initialPrompt)}${typeParam}${planParam}`
+      : `/auth/login?redirectTo=${encodeURIComponent(redirectTo)}${typeParam}${planParam}`;
+    setTimeout(() => { window.location.href = loginUrl; }, 2000);
+  }
 
   return (
     <div className="min-h-screen bg-[#171717] flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden">
-      {/* Decorative gradients */}
       <div className="absolute inset-0 pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-[#f472b6] opacity-10 rounded-full blur-3xl animate-pulse" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-[#38bdf8] opacity-10 rounded-full blur-3xl animate-pulse" />
@@ -130,7 +84,7 @@ export default function RegisterRoute() {
         </div>
 
         <div className="bg-[#262626] rounded-2xl p-8 shadow-xl ring-1 ring-[#2F2F2F]">
-          <Form method="post" className="space-y-5">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <input type="hidden" name="redirectTo" value={redirectTo} />
 
             {error && (
@@ -204,7 +158,7 @@ export default function RegisterRoute() {
             >
               {isSubmitting ? 'Creating account...' : 'Create account'}
             </button>
-          </Form>
+          </form>
         </div>
 
         <p className="mt-6 text-center text-sm text-[#A3A3A3]">

@@ -45,11 +45,24 @@ const html = `<!DOCTYPE html>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" />
   ${cssLink}
 </head>
-<body class="bg-[#171717] text-white antialiased">
+<body class="bg-[#0e0e10] text-white antialiased">
   <div id="root"></div>
     ${scriptTags}
 </body>
 </html>`;
 
+if (!fs.existsSync(distDir)) {
+  fs.mkdirSync(distDir, { recursive: true });
+}
 fs.writeFileSync(path.join(distDir, 'index.html'), html);
-console.log('Generated dist/index.html');
+
+// Copy assets to dist
+const distAssetsDir = path.join(distDir, 'assets');
+if (!fs.existsSync(distAssetsDir)) {
+  fs.mkdirSync(distAssetsDir, { recursive: true });
+}
+for (const f of files) {
+  fs.copyFileSync(path.join(assetsDir, f), path.join(distAssetsDir, f));
+}
+
+console.log('Generated dist/index.html and copied assets');

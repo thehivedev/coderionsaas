@@ -1,7 +1,6 @@
 import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
 import { useLoaderData, Link } from '@remix-run/react';
-import { requireAdmin } from '~/lib/admin.server';
-import { createSupabaseServiceClient } from '~/lib/supabaseServer';
+import { supabase } from '~/lib/supabaseClient';
 import { APP_NAME } from '~/lib/constants';
 import AdminLayout from '~/components/admin/AdminLayout';
 
@@ -25,13 +24,13 @@ interface ProjectsData {
   projects: AdminProject[];
 }
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const result = await requireAdmin(request);
-  if ('redirect' in result) return result.redirect;
+export async function loader() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: '/auth/login?redirectTo=/admin' } });
+  const { data: profile } = await supabase.from('profiles').select('id, email, is_admin').eq('id', user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: '/' } });
 
-  const serviceClient = createSupabaseServiceClient();
-
-  const { data: projects } = await serviceClient
+  const { data: projects } = await supabase
     .from('projects')
     .select('id, title, status, model_id, created_at, updated_at, user_id')
     .order('updated_at', { ascending: false })
@@ -39,7 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const userIds = [...new Set((projects || []).map((p: { user_id: string }) => p.user_id))];
 
-  const { data: profiles } = await serviceClient
+  const { data: profiles } = await supabase
     .from('profiles')
     .select('id, email')
     .in('id', userIds.length > 0 ? userIds : ['00000000-0000-0000-0000-000000000000']);
@@ -49,7 +48,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     emailMap[(p as { id: string }).id] = (p as { email: string }).email;
   }
 
-  const { data: fileCounts } = await serviceClient
+  const { data: fileCounts } = await supabase
     .from('project_files')
     .select('project_id');
 
@@ -71,7 +70,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }));
 
   return Response.json<ProjectsData>({
-    adminEmail: result.admin.email,
+    adminEmail: profile.email,
     projects: adminProjects,
   });
 }

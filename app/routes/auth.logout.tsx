@@ -1,29 +1,16 @@
-import type { ActionFunctionArgs } from '@remix-run/node';
-import { createSupabaseServerClient } from '~/lib/supabaseServer';
-
-export async function action({ request }: ActionFunctionArgs) {
-  const { supabase, headers } = createSupabaseServerClient(request);
-
-  await supabase.auth.signOut();
-
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: '/auth/login',
-      ...headers,
-    },
-  });
-}
-
-export async function loader() {
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: '/auth/login',
-    },
-  });
-}
+import { useEffect } from 'react';
+import { supabase } from '~/lib/supabaseClient';
 
 export default function LogoutRoute() {
-  return null;
+  useEffect(() => {
+    supabase.auth.signOut().then(() => {
+      window.location.href = '/auth/login';
+    });
+  }, []);
+
+  return (
+    <div className="min-h-screen bg-[#171717] flex items-center justify-center">
+      <p className="text-[#A3A3A3]">Signing out...</p>
+    </div>
+  );
 }

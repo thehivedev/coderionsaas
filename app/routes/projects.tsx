@@ -1,7 +1,7 @@
-import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
+import type { MetaFunction } from '@remix-run/node';
 import { useLoaderData, useNavigate } from '@remix-run/react';
 import { useState } from 'react';
-import { createSupabaseServerClient } from '~/lib/supabaseServer';
+import { supabase } from '~/lib/supabaseClient';
 import { APP_NAME } from '~/lib/constants';
 import type { Project, Profile } from '~/lib/types';
 import MenuClient from '~/components/sidebar/Menu';
@@ -11,12 +11,11 @@ export const meta: MetaFunction = () => [
   { title: `${APP_NAME} — Projects` },
 ];
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const { supabase, headers } = createSupabaseServerClient(request);
+export async function loader() {
   const { data: { user } } = await supabase.auth.getUser();
 
   if (!user) {
-    return new Response(null, { status: 302, headers: { Location: '/auth/login', ...headers } });
+    throw new Response(null, { status: 302, headers: { Location: '/auth/login' } });
   }
 
   const { data: profile } = await supabase
@@ -26,7 +25,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     .maybeSingle();
 
   if (!profile) {
-    return new Response(null, { status: 302, headers: { Location: '/auth/login', ...headers } });
+    throw new Response(null, { status: 302, headers: { Location: '/auth/login' } });
   }
 
   const { data: projects } = await supabase
@@ -41,7 +40,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       profile: profile as Profile,
       projects: (projects || []) as Project[],
     },
-    { headers },
   );
 }
 

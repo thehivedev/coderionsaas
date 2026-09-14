@@ -1,7 +1,6 @@
 import type { LoaderFunctionArgs, ActionFunctionArgs, MetaFunction } from '@remix-run/node';
 import { useLoaderData, useActionData, useNavigation, Form } from '@remix-run/react';
-import { requireAdmin } from '~/lib/admin.server';
-import { createSupabaseServerClient, createSupabaseServiceClient } from '~/lib/supabaseServer';
+import { supabase } from '~/lib/supabaseClient';
 import { APP_NAME } from '~/lib/constants';
 import AdminLayout from '~/components/admin/AdminLayout';
 
@@ -31,11 +30,11 @@ const CATEGORY_LABELS: Record<string, string> = {
 
 const CATEGORY_ORDER = ['ai', 'stripe', 'github', 'general'];
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const result = await requireAdmin(request);
-  if ('redirect' in result) return result.redirect;
-
-  const { supabase } = createSupabaseServerClient(request);
+export async function loader() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: '/auth/login?redirectTo=/admin' } });
+  const { data: profile } = await supabase.from('profiles').select('id, email, is_admin').eq('id', user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: '/' } });
 
   const { data: settings } = await supabase
     .from('app_settings')
@@ -43,16 +42,16 @@ export async function loader({ request }: LoaderFunctionArgs) {
     .order('category', { ascending: true });
 
   return Response.json<SettingsData>({
-    adminEmail: result.admin.email,
+    adminEmail: profile.email,
     settings: (settings || []) as Setting[],
-  }, { headers: result.headers });
+  });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
-  const result = await requireAdmin(request);
-  if ('redirect' in result) return result.redirect;
-
-  const { supabase, headers } = createSupabaseServerClient(request);
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: '/auth/login?redirectTo=/admin' } });
+  const { data: profile } = await supabase.from('profiles').select('id, email, is_admin').eq('id', user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: '/' } });
 
   const formData = await request.formData();
   const intent = String(formData.get('intent') || '');
@@ -62,7 +61,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const value = String(formData.get('value') || '');
 
     if (!key) {
-      return Response.json({ error: 'Missing the key' }, { status: 400, headers });
+      return Response.json({ error: 'Missing the key' }, { status: 400 });
     }
 
     const { error } = await supabase
@@ -71,10 +70,10 @@ export async function action({ request }: ActionFunctionArgs) {
       .eq('key', key);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
 
-    return Response.json({ success: true }, { headers });
+    return Response.json({ success: true });
   }
 
   if (intent === 'add') {
@@ -85,7 +84,7 @@ export async function action({ request }: ActionFunctionArgs) {
     const is_secret = formData.get('is_secret') === 'true';
 
     if (!key) {
-      return Response.json({ error: 'Missing the key' }, { status: 400, headers });
+      return Response.json({ error: 'Missing the key' }, { status: 400 });
     }
 
     const { error } = await supabase
@@ -93,10 +92,10 @@ export async function action({ request }: ActionFunctionArgs) {
       .insert({ key, value, category, label, is_secret });
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
 
-    return Response.json({ success: true }, { headers });
+    return Response.json({ success: true });
   }
 
   if (intent === 'delete') {
@@ -108,13 +107,13 @@ export async function action({ request }: ActionFunctionArgs) {
       .eq('key', key);
 
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
 
-    return Response.json({ success: true }, { headers });
+    return Response.json({ success: true });
   }
 
-  return Response.json({ error: 'Unrecognized action' }, { status: 400, headers });
+  return Response.json({ error: 'Unrecognized action' }, { status: 400 });
 }
 
 export default function AdminSettings() {
