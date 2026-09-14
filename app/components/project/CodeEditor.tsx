@@ -1,6 +1,8 @@
-import Editor, { type OnMount } from '@monaco-editor/react';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
+import type { OnMount } from '@monaco-editor/react';
 import type { ProjectFile } from '~/lib/types';
+
+const Editor = lazy(() => import('@monaco-editor/react').then((m) => ({ default: m.default })));
 
 interface CodeEditorProps {
   file: ProjectFile | null;
@@ -95,29 +97,40 @@ export default function CodeEditor({ file, onContentChange }: CodeEditorProps) {
 
       {/* Monaco editor */}
       <div className="flex-1 overflow-hidden">
-        <Editor
-          height="100%"
-          language={mapLanguage(file.language)}
-          value={content}
-          onMount={handleMount}
-          onChange={handleEditorChange}
-          theme="vs-dark"
-          options={{
-            fontSize: 13,
-            fontFamily: "'JetBrains Mono', 'Fira Code', 'Menlo', monospace",
-            fontLigatures: true,
-            minimap: { enabled: false },
-            scrollBeyondLastLine: false,
-            padding: { top: 12, bottom: 12 },
-            lineNumbers: 'on',
-            renderLineHighlight: 'all',
-            smoothScrolling: true,
-            cursorBlinking: 'smooth',
-            cursorSmoothCaretAnimation: 'on',
-            tabSize: 2,
-            automaticLayout: true,
-          }}
-        />
+        <Suspense
+          fallback={
+            <div className="flex items-center justify-center h-full bg-[#1E1E1E]">
+              <svg className="w-6 h-6 text-[#A3A3A3] animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+            </div>
+          }
+        >
+          <Editor
+            height="100%"
+            language={mapLanguage(file.language)}
+            value={content}
+            onMount={handleMount}
+            onChange={handleEditorChange}
+            theme="vs-dark"
+            options={{
+              fontSize: 13,
+              fontFamily: "'JetBrains Mono', 'Fira Code', 'Menlo', monospace",
+              fontLigatures: true,
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              padding: { top: 12, bottom: 12 },
+              lineNumbers: 'on',
+              renderLineHighlight: 'all',
+              smoothScrolling: true,
+              cursorBlinking: 'smooth',
+              cursorSmoothCaretAnimation: 'on',
+              tabSize: 2,
+              automaticLayout: true,
+            }}
+          />
+        </Suspense>
       </div>
     </div>
   );
