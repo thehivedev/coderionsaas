@@ -1,13 +1,13 @@
-import { jsx, jsxs } from "react/jsx-runtime";
+import { jsx, jsxs, Fragment } from "react/jsx-runtime";
 import { PassThrough } from "node:stream";
 import { createReadableStreamFromReadable } from "@remix-run/node";
-import { RemixServer, Outlet, Meta, Links, ScrollRestoration, Scripts, useSearchParams, useLoaderData, useLocation, Link, useActionData, useNavigation, Form, useNavigate } from "@remix-run/react";
+import { RemixServer, Outlet, Meta, Links, ScrollRestoration, Scripts, useNavigate, useLocation, Form, useSearchParams, useLoaderData, Link, useActionData, useNavigation } from "@remix-run/react";
 import * as isbotModule from "isbot";
 import { renderToPipeableStream } from "react-dom/server";
 import { createServerClient } from "@supabase/ssr";
 import { createClient } from "@supabase/supabase-js";
 import { parse, serialize } from "cookie";
-import { useRef, useState, useEffect } from "react";
+import { useState, useEffect, useMemo, Suspense, lazy, useRef, useCallback } from "react";
 import Stripe from "stripe";
 const ABORT_DELAY = 5e3;
 function handleRequest(request, responseStatusCode, responseHeaders, remixContext, loadContext) {
@@ -135,7 +135,7 @@ const links = () => [
   }
 ];
 function Layout({ children }) {
-  return /* @__PURE__ */ jsxs("html", { lang: "es", children: [
+  return /* @__PURE__ */ jsxs("html", { lang: "en", children: [
     /* @__PURE__ */ jsxs("head", { children: [
       /* @__PURE__ */ jsx("meta", { charSet: "utf-8" }),
       /* @__PURE__ */ jsx("meta", { name: "viewport", content: "width=device-width, initial-scale=1" }),
@@ -164,14 +164,21 @@ const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
 function createSupabaseServerClient(request) {
   const cookieHeader = request.headers.get("Cookie") ?? "";
   const cookies = parse(cookieHeader);
-  const setCookieHeaders = [];
+  const headers = {};
+  function syncSetCookie(value) {
+    if (headers["Set-Cookie"]) {
+      headers["Set-Cookie"] = headers["Set-Cookie"] + ", " + value;
+    } else {
+      headers["Set-Cookie"] = value;
+    }
+  }
   const serverClient = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
       get(key) {
         return cookies[key];
       },
       set(key, value, options) {
-        setCookieHeaders.push(
+        syncSetCookie(
           serialize(key, value, {
             path: "/",
             sameSite: "lax",
@@ -182,7 +189,7 @@ function createSupabaseServerClient(request) {
         );
       },
       remove(key, options) {
-        setCookieHeaders.push(
+        syncSetCookie(
           serialize(key, "", {
             path: "/",
             sameSite: "lax",
@@ -194,12 +201,6 @@ function createSupabaseServerClient(request) {
       }
     }
   });
-  const headers = {};
-  if (setCookieHeaders.length === 1) {
-    headers["Set-Cookie"] = setCookieHeaders[0];
-  } else if (setCookieHeaders.length > 1) {
-    headers["Set-Cookie"] = setCookieHeaders.join(", ");
-  }
   return { supabase: serverClient, headers };
 }
 function createSupabaseServiceClient() {
@@ -245,12 +246,12 @@ async function action$b({ request }) {
     data: { user }
   } = await supabase2.auth.getUser();
   if (!user) {
-    return Response.json({ error: "No autenticado" }, { status: 401, headers });
+    return Response.json({ error: "Not authenticated" }, { status: 401, headers });
   }
   const clientId = await getSetting("github_client_id");
   if (!clientId) {
     return Response.json(
-      { error: "GitHub OAuth no esta configurado. Configura las credenciales en el panel de administración." },
+      { error: "GitHub OAuth is not configured. Set the credentials in the admin panel." },
       { status: 503, headers }
     );
   }
@@ -373,10 +374,1283 @@ const SUPABASE_URL = "https://thhfunhmylimhdhehipi.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoaGZ1bmhteWxpbWhkaGVoaXBpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzMzQzOTksImV4cCI6MjEwNDkxMDM5OX0.Fy3eE0yzhdp4APT4XQJ_nfpipeMP93hwO1A3wZ8xzCI";
 const APP_NAME = "Coderion";
 const APP_VERSION = "2.0.0";
-const MenuClient = void 0;
-const ProjectWorkspace = void 0;
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
+async function getProjects(userId) {
+  const { data, error } = await supabase.from("projects").select("*").eq("user_id", userId).order("updated_at", { ascending: false });
+  if (error) {
+    console.error("Error fetching projects:", error);
+    return [];
+  }
+  return data || [];
+}
+async function createProject(userId) {
+  const { data, error } = await supabase.from("projects").insert({
+    user_id: userId,
+    title: "New project",
+    messages: []
+  }).select().maybeSingle();
+  if (error) {
+    console.error("Error creating project:", error);
+    return null;
+  }
+  return data;
+}
+async function deleteProject(projectId) {
+  const { error } = await supabase.from("projects").delete().eq("id", projectId);
+  if (error) {
+    console.error("Error deleting project:", error);
+    return false;
+  }
+  return true;
+}
+async function getProjectFiles(projectId) {
+  const { data, error } = await supabase.from("project_files").select("*").eq("project_id", projectId).order("path", { ascending: true });
+  if (error) {
+    console.error("Error fetching project files:", error);
+    return [];
+  }
+  return data || [];
+}
+async function deleteProjectFile(fileId) {
+  const { error } = await supabase.from("project_files").delete().eq("id", fileId);
+  if (error) {
+    console.error("Error deleting project file:", error);
+    return false;
+  }
+  return true;
+}
+function MenuClient({ user, profile }) {
+  const [projects, setProjects] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  useEffect(() => {
+    loadProjects();
+  }, []);
+  async function loadProjects() {
+    setIsLoading(true);
+    const data = await getProjects(user.id);
+    setProjects(data);
+    setIsLoading(false);
+  }
+  async function handleNewProject() {
+    if (isCreating) return;
+    setIsCreating(true);
+    const project = await createProject(user.id);
+    if (project) {
+      setProjects((prev) => [project, ...prev]);
+      navigate(`/project/${project.id}`);
+    }
+    setIsCreating(false);
+  }
+  async function handleDeleteProject(projectId, e) {
+    e.stopPropagation();
+    const success = await deleteProject(projectId);
+    if (success) {
+      setProjects((prev) => prev.filter((p) => p.id !== projectId));
+      if (location.pathname === `/project/${projectId}`) {
+        navigate("/");
+      }
+    }
+  }
+  async function handleBuyTokens(pkg) {
+    if (isRedirecting) return;
+    setIsRedirecting(true);
+    try {
+      const response = await fetch("/api/checkout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ package: pkg })
+      });
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch {
+      console.error("Checkout redirect failed");
+    } finally {
+      setIsRedirecting(false);
+    }
+  }
+  return /* @__PURE__ */ jsxs(Fragment, { children: [
+    isSidebarOpen && /* @__PURE__ */ jsx(
+      "div",
+      {
+        className: "fixed inset-0 bg-black/50 z-20 lg:hidden",
+        onClick: () => setIsSidebarOpen(false)
+      }
+    ),
+    /* @__PURE__ */ jsx(
+      "aside",
+      {
+        className: `fixed lg:static inset-y-0 left-0 z-30 w-72 bg-[#1E1E1E] border-r border-[#2F2F2F] transform transition-transform duration-300 lg:transform-none ${isSidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`,
+        children: /* @__PURE__ */ jsxs("div", { className: "flex flex-col h-full", children: [
+          /* @__PURE__ */ jsxs("div", { className: "p-4 border-b border-[#2F2F2F]", children: [
+            /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between mb-4", children: [
+              /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+                /* @__PURE__ */ jsx("svg", { className: "w-7 h-7 text-[#9E7FFF]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M13 10V3L4 14h7v7l9-11h-7z" }) }),
+                /* @__PURE__ */ jsx("span", { className: "text-lg font-bold text-white", children: APP_NAME })
+              ] }),
+              /* @__PURE__ */ jsx(
+                "button",
+                {
+                  onClick: () => setIsSidebarOpen(false),
+                  className: "lg:hidden text-[#A3A3A3] hover:text-white p-2 rounded-lg hover:bg-[#2F2F2F] transition-colors",
+                  "aria-label": "Close menu",
+                  children: /* @__PURE__ */ jsx("svg", { className: "w-5 h-5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18L18 6M6 6l12 12" }) })
+                }
+              )
+            ] }),
+            /* @__PURE__ */ jsxs(
+              "button",
+              {
+                onClick: handleNewProject,
+                disabled: isCreating,
+                className: "w-full flex items-center justify-center gap-2 bg-[#9E7FFF] text-white font-semibold rounded-xl px-4 py-3 hover:bg-[#8B6EE6] focus:outline-none focus:ring-2 focus:ring-[#9E7FFF]/40 transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+                children: [
+                  isCreating ? /* @__PURE__ */ jsxs("svg", { className: "w-5 h-5 animate-spin", fill: "none", viewBox: "0 0 24 24", children: [
+                    /* @__PURE__ */ jsx("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
+                    /* @__PURE__ */ jsx("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" })
+                  ] }) : /* @__PURE__ */ jsx("svg", { className: "w-5 h-5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 4v16m8-8H4" }) }),
+                  "New project"
+                ]
+              }
+            )
+          ] }),
+          /* @__PURE__ */ jsx("div", { className: "flex-1 overflow-y-auto p-2", children: isLoading ? /* @__PURE__ */ jsx("div", { className: "flex items-center justify-center py-8", children: /* @__PURE__ */ jsxs("svg", { className: "w-6 h-6 text-[#A3A3A3] animate-spin", fill: "none", viewBox: "0 0 24 24", children: [
+            /* @__PURE__ */ jsx("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
+            /* @__PURE__ */ jsx("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" })
+          ] }) }) : projects.length === 0 ? /* @__PURE__ */ jsxs("div", { className: "text-center py-8 px-4", children: [
+            /* @__PURE__ */ jsx("svg", { className: "w-12 h-12 text-[#3F3F3F] mx-auto mb-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 1.5, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" }) }),
+            /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3]", children: "No projects yet" })
+          ] }) : /* @__PURE__ */ jsx("ul", { className: "space-y-1", children: projects.map((project) => /* @__PURE__ */ jsx("li", { children: /* @__PURE__ */ jsxs(
+            "div",
+            {
+              className: `group flex items-center gap-2 px-3 py-2.5 rounded-lg cursor-pointer transition-colors ${location.pathname === `/project/${project.id}` ? "bg-[#2F2F2F] text-white" : "text-[#A3A3A3] hover:bg-[#262626] hover:text-white"}`,
+              onClick: () => navigate(`/project/${project.id}`),
+              children: [
+                /* @__PURE__ */ jsx("svg", { className: "w-4 h-4 flex-shrink-0", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" }) }),
+                /* @__PURE__ */ jsx("span", { className: "flex-1 text-sm truncate", children: project.title }),
+                /* @__PURE__ */ jsx(
+                  "button",
+                  {
+                    onClick: (e) => handleDeleteProject(project.id, e),
+                    className: "opacity-0 group-hover:opacity-100 text-[#A3A3A3] hover:text-red-400 p-1 rounded transition-all",
+                    "aria-label": "Delete project",
+                    children: /* @__PURE__ */ jsx("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) })
+                  }
+                )
+              ]
+            }
+          ) }, project.id)) }) }),
+          /* @__PURE__ */ jsxs("div", { className: "p-4 border-t border-[#2F2F2F]", children: [
+            /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3 mb-3", children: [
+              /* @__PURE__ */ jsx("div", { className: "w-10 h-10 rounded-full bg-[#9E7FFF]/20 flex items-center justify-center flex-shrink-0", children: profile.avatar_url ? /* @__PURE__ */ jsx(
+                "img",
+                {
+                  src: profile.avatar_url,
+                  alt: profile.full_name || user.email,
+                  className: "w-10 h-10 rounded-full object-cover"
+                }
+              ) : /* @__PURE__ */ jsx("span", { className: "text-[#9E7FFF] font-semibold text-sm", children: (profile.full_name || user.email).charAt(0).toUpperCase() }) }),
+              /* @__PURE__ */ jsxs("div", { className: "flex-1 min-w-0", children: [
+                /* @__PURE__ */ jsx("p", { className: "text-sm font-medium text-white truncate", children: profile.full_name || user.email }),
+                /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3] truncate", children: user.email })
+              ] })
+            ] }),
+            /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between mb-3 px-3 py-2 bg-[#262626] rounded-lg", children: [
+              /* @__PURE__ */ jsx("span", { className: "text-xs text-[#A3A3A3]", children: "Tokens" }),
+              /* @__PURE__ */ jsx("span", { className: "text-sm font-semibold text-[#9E7FFF]", children: profile.token_balance.toLocaleString() })
+            ] }),
+            /* @__PURE__ */ jsxs(
+              "a",
+              {
+                href: "/admin",
+                className: "w-full flex items-center justify-center gap-2 text-sm text-[#A3A3A3] hover:text-white transition-colors bg-[#262626] border border-[#2F2F2F] rounded-lg px-4 py-2.5 hover:bg-[#2F2F2F] mb-2",
+                children: [
+                  /* @__PURE__ */ jsxs("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+                    /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" }),
+                    /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M15 12a3 3 0 11-6 0 3 3 0 016 0z" })
+                  ] }),
+                  "Admin panel"
+                ]
+              }
+            ),
+            /* @__PURE__ */ jsx(
+              "button",
+              {
+                onClick: () => handleBuyTokens("basic"),
+                disabled: isRedirecting,
+                className: "w-full flex items-center justify-center gap-2 text-sm text-[#9E7FFF] hover:text-white transition-colors bg-[#9E7FFF]/10 border border-[#9E7FFF]/30 rounded-lg px-4 py-2.5 hover:bg-[#9E7FFF]/20 focus:outline-none focus:ring-2 focus:ring-[#9E7FFF]/40 disabled:opacity-50 mb-2",
+                children: isRedirecting ? "Redirecting..." : "Buy tokens"
+              }
+            ),
+            /* @__PURE__ */ jsx(Form, { method: "post", action: "/auth/logout", children: /* @__PURE__ */ jsxs(
+              "button",
+              {
+                type: "submit",
+                className: "w-full flex items-center justify-center gap-2 text-sm text-[#A3A3A3] hover:text-white transition-colors bg-[#262626] border border-[#2F2F2F] rounded-lg px-4 py-2.5 hover:bg-[#2F2F2F] focus:outline-none focus:ring-2 focus:ring-[#9E7FFF]/40",
+                children: [
+                  /* @__PURE__ */ jsx("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" }) }),
+                  "Log out"
+                ]
+              }
+            ) })
+          ] })
+        ] })
+      }
+    ),
+    /* @__PURE__ */ jsx(
+      "button",
+      {
+        onClick: () => setIsSidebarOpen(true),
+        className: "fixed top-4 left-4 z-10 lg:hidden bg-[#262626] border border-[#2F2F2F] rounded-lg p-2 text-white hover:bg-[#2F2F2F] transition-colors",
+        "aria-label": "Open menu",
+        children: /* @__PURE__ */ jsx("svg", { className: "w-6 h-6", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 6h16M4 12h16M4 18h16" }) })
+      }
+    )
+  ] });
+}
+function buildTree(files) {
+  const root = { name: "", path: "", isFolder: true, children: [] };
+  for (const file of files) {
+    const parts = file.path.split("/");
+    let current = root;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const isLast = i === parts.length - 1;
+      const fullPath = parts.slice(0, i + 1).join("/");
+      let child = current.children.find((c) => c.name === part);
+      if (!child) {
+        child = {
+          name: part,
+          path: fullPath,
+          isFolder: !isLast,
+          children: [],
+          file: isLast ? file : void 0
+        };
+        current.children.push(child);
+      }
+      current = child;
+    }
+  }
+  sortTree(root);
+  return root;
+}
+function sortTree(node) {
+  node.children.sort((a, b) => {
+    if (a.isFolder !== b.isFolder) return a.isFolder ? -1 : 1;
+    return a.name.localeCompare(b.name);
+  });
+  node.children.forEach(sortTree);
+}
+function getIcon(name, isFolder) {
+  var _a;
+  const ext = ((_a = name.split(".").pop()) == null ? void 0 : _a.toLowerCase()) || "";
+  const iconMap = {
+    tsx: "react",
+    jsx: "react",
+    ts: "ts",
+    js: "js",
+    json: "json",
+    css: "css",
+    html: "html",
+    md: "md"
+  };
+  return iconMap[ext] || "file";
+}
+function Icon({ type }) {
+  const icons = {
+    folder: /* @__PURE__ */ jsx("svg", { className: "w-4 h-4 text-[#9E7FFF]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" }) }),
+    react: /* @__PURE__ */ jsxs("svg", { className: "w-4 h-4 text-[#61DAFB]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 1.5, children: [
+      /* @__PURE__ */ jsx("circle", { cx: "12", cy: "12", r: "2" }),
+      /* @__PURE__ */ jsx("ellipse", { cx: "12", cy: "12", rx: "10", ry: "4" }),
+      /* @__PURE__ */ jsx("ellipse", { cx: "12", cy: "12", rx: "10", ry: "4", transform: "rotate(60 12 12)" }),
+      /* @__PURE__ */ jsx("ellipse", { cx: "12", cy: "12", rx: "10", ry: "4", transform: "rotate(120 12 12)" })
+    ] }),
+    ts: /* @__PURE__ */ jsxs("svg", { className: "w-4 h-4 text-[#3178C6]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+      /* @__PURE__ */ jsx("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }),
+      /* @__PURE__ */ jsx("path", { d: "M9 17V9h6" }),
+      /* @__PURE__ */ jsx("path", { d: "M15 17v-4" })
+    ] }),
+    js: /* @__PURE__ */ jsxs("svg", { className: "w-4 h-4 text-[#F7DF1E]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+      /* @__PURE__ */ jsx("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }),
+      /* @__PURE__ */ jsx("path", { d: "M9 17v-5M15 17v-3a2 2 0 00-2-2" })
+    ] }),
+    json: /* @__PURE__ */ jsx("svg", { className: "w-4 h-4 text-[#A3A3A3]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { d: "M8 6c-2 0-3 1-3 3s1 3 3 3 3 1 3 3-1 3-3 3M16 6c2 0 3 1 3 3s-1 3-3 3-3 1-3 3 1 3 3 3" }) }),
+    css: /* @__PURE__ */ jsx("svg", { className: "w-4 h-4 text-[#1572B6]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { d: "M5 4l1 16 6 2 6-2 1-16M8 8h8l-1 8-5 2-5-2" }) }),
+    html: /* @__PURE__ */ jsx("svg", { className: "w-4 h-4 text-[#E34F26]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { d: "M4 4l2 16 6 2 6-2 2-16M7 8h10l-1 10-4 2-4-2" }) }),
+    md: /* @__PURE__ */ jsxs("svg", { className: "w-4 h-4 text-[#A3A3A3]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+      /* @__PURE__ */ jsx("rect", { x: "3", y: "3", width: "18", height: "18", rx: "2" }),
+      /* @__PURE__ */ jsx("path", { d: "M8 12h8M8 8h8M8 16h4" })
+    ] }),
+    file: /* @__PURE__ */ jsxs("svg", { className: "w-4 h-4 text-[#A3A3A3]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: [
+      /* @__PURE__ */ jsx("path", { d: "M13 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V9l-6-6z" }),
+      /* @__PURE__ */ jsx("path", { d: "M13 3v6h6" })
+    ] })
+  };
+  return icons[type] || icons.file;
+}
+function TreeItem({
+  node,
+  depth,
+  selectedFile,
+  onSelectFile,
+  onDeleteFile
+}) {
+  const paddingLeft = depth * 12 + 8;
+  if (node.isFolder && node.path) {
+    return /* @__PURE__ */ jsxs("div", { children: [
+      /* @__PURE__ */ jsxs(
+        "div",
+        {
+          className: "flex items-center gap-1.5 px-2 py-1 text-xs text-[#A3A3A3] cursor-default",
+          style: { paddingLeft },
+          children: [
+            /* @__PURE__ */ jsx(Icon, { type: "folder" }),
+            /* @__PURE__ */ jsx("span", { className: "truncate", children: node.name })
+          ]
+        }
+      ),
+      node.children.map((child) => /* @__PURE__ */ jsx(
+        TreeItem,
+        {
+          node: child,
+          depth: depth + 1,
+          selectedFile,
+          onSelectFile,
+          onDeleteFile
+        },
+        child.path
+      ))
+    ] });
+  }
+  if (!node.file) {
+    return /* @__PURE__ */ jsx(Fragment, { children: node.children.map((child) => /* @__PURE__ */ jsx(
+      TreeItem,
+      {
+        node: child,
+        depth,
+        selectedFile,
+        onSelectFile,
+        onDeleteFile
+      },
+      child.path
+    )) });
+  }
+  const isSelected = (selectedFile == null ? void 0 : selectedFile.id) === node.file.id;
+  return /* @__PURE__ */ jsxs(
+    "div",
+    {
+      className: `group flex items-center gap-1.5 px-2 py-1 cursor-pointer transition-colors ${isSelected ? "bg-[#9E7FFF]/10 text-white" : "text-[#A3A3A3] hover:bg-[#262626] hover:text-white"}`,
+      style: { paddingLeft },
+      onClick: () => onSelectFile(node.file),
+      children: [
+        /* @__PURE__ */ jsx(Icon, { type: getIcon(node.name) }),
+        /* @__PURE__ */ jsx("span", { className: "text-xs truncate flex-1", children: node.name }),
+        /* @__PURE__ */ jsx(
+          "button",
+          {
+            onClick: (e) => {
+              e.stopPropagation();
+              onDeleteFile(node.file.id);
+            },
+            className: "opacity-0 group-hover:opacity-100 text-[#A3A3A3] hover:text-red-400 transition-all",
+            "aria-label": "Delete file",
+            children: /* @__PURE__ */ jsx("svg", { className: "w-3 h-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) })
+          }
+        )
+      ]
+    }
+  );
+}
+function FileTree({ files, selectedFile, onSelectFile, onDeleteFile }) {
+  const tree = useMemo(() => buildTree(files), [files]);
+  if (files.length === 0) {
+    return /* @__PURE__ */ jsxs("div", { className: "p-4 text-center", children: [
+      /* @__PURE__ */ jsx("svg", { className: "w-10 h-10 text-[#3F3F3F] mx-auto mb-2", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 1.5, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" }) }),
+      /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3]", children: "No files generated" })
+    ] });
+  }
+  return /* @__PURE__ */ jsx("div", { className: "py-2 overflow-y-auto h-full", children: /* @__PURE__ */ jsx(
+    TreeItem,
+    {
+      node: tree,
+      depth: 0,
+      selectedFile,
+      onSelectFile,
+      onDeleteFile
+    }
+  ) });
+}
+const Editor = lazy(() => import("@monaco-editor/react").then((m) => ({ default: m.default })));
+function mapLanguage(lang) {
+  const map = {
+    tsx: "typescript",
+    ts: "typescript",
+    jsx: "javascript",
+    js: "javascript",
+    json: "json",
+    css: "css",
+    html: "html",
+    md: "markdown",
+    mdx: "markdown",
+    py: "python",
+    sh: "shell",
+    yaml: "yaml",
+    yml: "yaml",
+    sql: "sql",
+    toml: "ini"
+  };
+  return map[lang] || "plaintext";
+}
+function CodeEditor({ file, onContentChange }) {
+  const [content, setContent] = useState("");
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  useEffect(() => {
+    if (file) {
+      setContent(file.content);
+      setHasUnsavedChanges(false);
+    }
+  }, [file == null ? void 0 : file.id, file == null ? void 0 : file.version]);
+  if (!file) {
+    return /* @__PURE__ */ jsx("div", { className: "flex-1 flex items-center justify-center bg-[#171717]", children: /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
+      /* @__PURE__ */ jsxs("svg", { className: "w-12 h-12 text-[#3F3F3F] mx-auto mb-2", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 1.5, children: [
+        /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M13 3H7a2 2 0 00-2 2v14a2 2 0 002 2h10a2 2 0 002-2V9l-6-6z" }),
+        /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M13 3v6h6" })
+      ] }),
+      /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3]", children: "Select a file to edit" })
+    ] }) });
+  }
+  const handleMount = (editor) => {
+    editor.focus();
+  };
+  function handleEditorChange(value) {
+    const newValue = value || "";
+    setContent(newValue);
+    if (file && newValue !== file.content) {
+      setHasUnsavedChanges(true);
+      onContentChange(file.id, newValue);
+    }
+  }
+  return /* @__PURE__ */ jsxs("div", { className: "flex-1 flex flex-col overflow-hidden", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-[#1E1E1E] border-b border-[#2F2F2F] px-3 py-1.5", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-xs font-mono text-[#A3A3A3]", children: file.path }),
+        hasUnsavedChanges && /* @__PURE__ */ jsx("span", { className: "w-2 h-2 rounded-full bg-[#9E7FFF]", title: "Unsaved changes" })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx("span", { className: "text-xs px-1.5 py-0.5 rounded bg-[#262626] text-[#A3A3A3]", children: file.language }),
+        /* @__PURE__ */ jsxs("span", { className: "text-xs text-[#A3A3A3]", children: [
+          "v",
+          file.version
+        ] }),
+        /* @__PURE__ */ jsxs(
+          "button",
+          {
+            onClick: () => navigator.clipboard.writeText(content),
+            className: "text-xs text-[#A3A3A3] hover:text-white transition-colors flex items-center gap-1",
+            children: [
+              /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" }) }),
+              "Copy"
+            ]
+          }
+        )
+      ] })
+    ] }),
+    /* @__PURE__ */ jsx("div", { className: "flex-1 overflow-hidden", children: /* @__PURE__ */ jsx(
+      Suspense,
+      {
+        fallback: /* @__PURE__ */ jsx("div", { className: "flex items-center justify-center h-full bg-[#1E1E1E]", children: /* @__PURE__ */ jsxs("svg", { className: "w-6 h-6 text-[#A3A3A3] animate-spin", fill: "none", viewBox: "0 0 24 24", children: [
+          /* @__PURE__ */ jsx("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
+          /* @__PURE__ */ jsx("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" })
+        ] }) }),
+        children: /* @__PURE__ */ jsx(
+          Editor,
+          {
+            height: "100%",
+            language: mapLanguage(file.language),
+            value: content,
+            onMount: handleMount,
+            onChange: handleEditorChange,
+            theme: "vs-dark",
+            options: {
+              fontSize: 13,
+              fontFamily: "'JetBrains Mono', 'Fira Code', 'Menlo', monospace",
+              fontLigatures: true,
+              minimap: { enabled: false },
+              scrollBeyondLastLine: false,
+              padding: { top: 12, bottom: 12 },
+              lineNumbers: "on",
+              renderLineHighlight: "all",
+              smoothScrolling: true,
+              cursorBlinking: "smooth",
+              cursorSmoothCaretAnimation: "on",
+              tabSize: 2,
+              automaticLayout: true
+            }
+          }
+        )
+      }
+    ) })
+  ] });
+}
+function findFile(files, path) {
+  return files.find((f) => f.path === path || f.path.endsWith("/" + path));
+}
+function buildPreview(files) {
+  const htmlFile = findFile(files, "index.html") || findFile(files, "index.htm");
+  const cssFiles = files.filter((f) => f.language === "css" || f.path.endsWith(".css"));
+  const jsFiles = files.filter(
+    (f) => f.language === "js" || f.language === "javascript" || f.path.endsWith(".js")
+  );
+  let html = (htmlFile == null ? void 0 : htmlFile.content) || '<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n</head>\n<body>\n</body>\n</html>';
+  const styleTags = cssFiles.map((f) => `<style data-path="${f.path}">
+${f.content}
+</style>`).join("\n");
+  if (styleTags) {
+    html = html.replace("</head>", `${styleTags}
+</head>`);
+  }
+  const scriptTags = jsFiles.map((f) => `<script data-path="${f.path}">
+${f.content}
+<\/script>`).join("\n");
+  if (scriptTags) {
+    html = html.replace("</body>", `${scriptTags}
+</body>`);
+  }
+  return html;
+}
+function LivePreview({ files }) {
+  const [iframeKey, setIframeKey] = useState(0);
+  const [autoRefresh, setAutoRefresh] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState(Date.now());
+  const previewHtml = useMemo(() => buildPreview(files), [files]);
+  useEffect(() => {
+    if (autoRefresh) {
+      const timer = setTimeout(() => {
+        setIframeKey((k) => k + 1);
+        setLastRefresh(Date.now());
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [previewHtml, autoRefresh]);
+  const hasHtml = files.some(
+    (f) => f.path.endsWith(".html") || f.path.endsWith(".htm")
+  );
+  if (!hasHtml) {
+    return /* @__PURE__ */ jsx("div", { className: "flex-1 flex items-center justify-center bg-[#171717]", children: /* @__PURE__ */ jsxs("div", { className: "text-center px-6", children: [
+      /* @__PURE__ */ jsxs("svg", { className: "w-12 h-12 text-[#3F3F3F] mx-auto mb-3", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 1.5, children: [
+        /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M15 12a3 3 0 11-6 0 3 3 0 016 0z" }),
+        /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" })
+      ] }),
+      /* @__PURE__ */ jsx("h3", { className: "text-sm font-medium text-white mb-1", children: "Preview not available" }),
+      /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3] max-w-xs", children: "Live preview appears when the project has an index.html file. For React projects, add an HTML file with the entry point." })
+    ] }) });
+  }
+  return /* @__PURE__ */ jsxs("div", { className: "flex-1 flex flex-col overflow-hidden", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between bg-[#1E1E1E] border-b border-[#2F2F2F] px-3 py-1.5", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1.5", children: [
+          /* @__PURE__ */ jsx("div", { className: "w-2.5 h-2.5 rounded-full bg-red-500/60" }),
+          /* @__PURE__ */ jsx("div", { className: "w-2.5 h-2.5 rounded-full bg-yellow-500/60" }),
+          /* @__PURE__ */ jsx("div", { className: "w-2.5 h-2.5 rounded-full bg-green-500/60" })
+        ] }),
+        /* @__PURE__ */ jsx("span", { className: "text-xs text-[#A3A3A3] ml-2", children: "preview" })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsx(
+          "button",
+          {
+            onClick: () => setAutoRefresh(!autoRefresh),
+            className: `text-xs px-2 py-1 rounded transition-colors ${autoRefresh ? "text-[#9E7FFF] bg-[#9E7FFF]/10" : "text-[#A3A3A3] hover:text-white"}`,
+            children: autoRefresh ? "Auto" : "Manual"
+          }
+        ),
+        /* @__PURE__ */ jsx(
+          "button",
+          {
+            onClick: () => {
+              setIframeKey((k) => k + 1);
+              setLastRefresh(Date.now());
+            },
+            className: "text-[#A3A3A3] hover:text-white transition-colors p-1",
+            "aria-label": "Refresh",
+            children: /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.582m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" }) })
+          }
+        ),
+        /* @__PURE__ */ jsx("span", { className: "text-xs text-[#A3A3A3]", children: new Date(lastRefresh).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" }) })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsx("div", { className: "flex-1 bg-white overflow-hidden", children: /* @__PURE__ */ jsx(
+      "iframe",
+      {
+        srcDoc: previewHtml,
+        title: "preview",
+        sandbox: "allow-scripts allow-modals allow-forms allow-popups",
+        className: "w-full h-full border-0"
+      },
+      iframeKey
+    ) })
+  ] });
+}
+function GitHubPanel({ projectId, onImported }) {
+  const [connection, setConnection] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showImport, setShowImport] = useState(false);
+  const [showPush, setShowPush] = useState(false);
+  const [repoUrl, setRepoUrl] = useState("");
+  const [newRepoName, setNewRepoName] = useState("");
+  const [branch, setBranch] = useState("");
+  const [newBranch, setNewBranch] = useState("");
+  const [commitMessage, setCommitMessage] = useState("");
+  const [openPR, setOpenPR] = useState(false);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(null);
+  useEffect(() => {
+    loadConnection();
+  }, []);
+  async function loadConnection() {
+    setLoading(true);
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!(session == null ? void 0 : session.user)) {
+      setLoading(false);
+      return;
+    }
+    const { data, error: error2 } = await supabase.from("github_connections").select("*").eq("user_id", session.user.id).maybeSingle();
+    if (!error2) {
+      setConnection(data);
+    }
+    setLoading(false);
+  }
+  async function handleConnect() {
+    try {
+      const res = await fetch("/api/github-connect", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await res.json();
+      if (data.authUrl) {
+        window.location.href = data.authUrl;
+      }
+    } catch {
+      setError("Error connecting to GitHub");
+    }
+  }
+  async function handleDisconnect() {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!(session == null ? void 0 : session.user)) return;
+    const { error: error2 } = await supabase.from("github_connections").delete().eq("user_id", session.user.id);
+    if (!error2) {
+      setConnection(null);
+    }
+  }
+  async function handleImport() {
+    if (!repoUrl.trim() || busy) return;
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch("/api/github-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ projectId, repoUrl })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Import error");
+        return;
+      }
+      setSuccess(`Imported ${data.imported} files from ${data.repo} (branch: ${data.branch})`);
+      setShowImport(false);
+      setRepoUrl("");
+      onImported == null ? void 0 : onImported();
+    } catch {
+      setError("Connection error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function handlePush() {
+    if (busy) return;
+    if (!newRepoName.trim() && !repoUrl.trim()) return;
+    setBusy(true);
+    setError(null);
+    setSuccess(null);
+    try {
+      const res = await fetch("/api/github-push", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          repoUrl: repoUrl.trim() || void 0,
+          newRepoName: newRepoName.trim() || void 0,
+          branch: branch.trim() || void 0,
+          newBranch: newBranch.trim() || void 0,
+          commitMessage: commitMessage.trim() || void 0,
+          openPR,
+          isPrivate
+        })
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Push error");
+        return;
+      }
+      let msg = `Pushed ${data.filesPushed} files to ${data.repo} (branch: ${data.branch})`;
+      if (data.prUrl) {
+        msg += ` — Pull Request created: ${data.prUrl}`;
+      }
+      setSuccess(msg);
+      setShowPush(false);
+      setRepoUrl("");
+      setNewRepoName("");
+      setNewBranch("");
+      setCommitMessage("");
+      setOpenPR(false);
+    } catch {
+      setError("Connection error");
+    } finally {
+      setBusy(false);
+    }
+  }
+  if (loading) {
+    return /* @__PURE__ */ jsx("div", { className: "flex items-center justify-center py-4", children: /* @__PURE__ */ jsxs("svg", { className: "w-5 h-5 text-[#A3A3A3] animate-spin", fill: "none", viewBox: "0 0 24 24", children: [
+      /* @__PURE__ */ jsx("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
+      /* @__PURE__ */ jsx("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" })
+    ] }) });
+  }
+  if (!connection) {
+    return /* @__PURE__ */ jsxs("div", { className: "px-3 py-2", children: [
+      /* @__PURE__ */ jsxs(
+        "button",
+        {
+          onClick: handleConnect,
+          className: "w-full flex items-center justify-center gap-2 text-xs text-white bg-[#262626] border border-[#2F2F2F] rounded-lg px-3 py-2 hover:bg-[#2F2F2F] transition-colors",
+          children: [
+            /* @__PURE__ */ jsx("svg", { className: "w-4 h-4", fill: "currentColor", viewBox: "0 0 24 24", children: /* @__PURE__ */ jsx("path", { d: "M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12" }) }),
+            "Connect GitHub"
+          ]
+        }
+      ),
+      error && /* @__PURE__ */ jsx("p", { className: "text-xs text-red-400 mt-2", children: error })
+    ] });
+  }
+  return /* @__PURE__ */ jsxs("div", { className: "px-3 py-2 space-y-2", children: [
+    /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 bg-[#262626] rounded-lg px-3 py-2", children: [
+      connection.github_avatar_url ? /* @__PURE__ */ jsx(
+        "img",
+        {
+          src: connection.github_avatar_url,
+          alt: connection.github_username,
+          className: "w-5 h-5 rounded-full"
+        }
+      ) : /* @__PURE__ */ jsx("div", { className: "w-5 h-5 rounded-full bg-[#9E7FFF]/20 flex items-center justify-center", children: /* @__PURE__ */ jsx("span", { className: "text-[10px] text-[#9E7FFF] font-semibold", children: connection.github_username.charAt(0).toUpperCase() }) }),
+      /* @__PURE__ */ jsx("span", { className: "text-xs text-white truncate flex-1", children: connection.github_username }),
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: handleDisconnect,
+          className: "text-xs text-[#A3A3A3] hover:text-red-400 transition-colors",
+          title: "Disconnect",
+          children: /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M6 18L18 6M6 6l12 12" }) })
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsxs(
+      "button",
+      {
+        onClick: () => {
+          setShowImport(!showImport);
+          setShowPush(false);
+          setError(null);
+          setSuccess(null);
+        },
+        className: "w-full flex items-center gap-2 text-xs text-[#A3A3A3] hover:text-white bg-[#262626] border border-[#2F2F2F] rounded-lg px-3 py-2 hover:bg-[#2F2F2F] transition-colors",
+        children: [
+          /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" }) }),
+          "Import from GitHub"
+        ]
+      }
+    ),
+    showImport && /* @__PURE__ */ jsxs("div", { className: "bg-[#262626] rounded-lg p-3 space-y-2 border border-[#2F2F2F]", children: [
+      /* @__PURE__ */ jsx(
+        "input",
+        {
+          type: "text",
+          value: repoUrl,
+          onChange: (e) => setRepoUrl(e.target.value),
+          placeholder: "https://github.com/user/repo",
+          className: "w-full bg-[#1E1E1E] text-white text-xs rounded-md px-3 py-2 border border-[#2F2F2F] focus:outline-none focus:border-[#9E7FFF]/50"
+        }
+      ),
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: handleImport,
+          disabled: !repoUrl.trim() || busy,
+          className: "w-full bg-[#9E7FFF] text-white text-xs font-medium rounded-md px-3 py-2 hover:bg-[#8B6EE6] transition-colors disabled:opacity-50",
+          children: busy ? "Importing..." : "Import files"
+        }
+      )
+    ] }),
+    /* @__PURE__ */ jsxs(
+      "button",
+      {
+        onClick: () => {
+          setShowPush(!showPush);
+          setShowImport(false);
+          setError(null);
+          setSuccess(null);
+        },
+        className: "w-full flex items-center gap-2 text-xs text-[#A3A3A3] hover:text-white bg-[#262626] border border-[#2F2F2F] rounded-lg px-3 py-2 hover:bg-[#2F2F2F] transition-colors",
+        children: [
+          /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M4 12l4 4 12-12M4 20h16" }) }),
+          "Push to GitHub"
+        ]
+      }
+    ),
+    showPush && /* @__PURE__ */ jsxs("div", { className: "bg-[#262626] rounded-lg p-3 space-y-2 border border-[#2F2F2F]", children: [
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx("label", { className: "text-xs text-[#A3A3A3]", children: "Existing repo (optional)" }),
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "text",
+            value: repoUrl,
+            onChange: (e) => setRepoUrl(e.target.value),
+            placeholder: "https://github.com/user/repo",
+            className: "w-full bg-[#1E1E1E] text-white text-xs rounded-md px-3 py-2 border border-[#2F2F2F] focus:outline-none focus:border-[#9E7FFF]/50"
+          }
+        )
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx("label", { className: "text-xs text-[#A3A3A3]", children: "Or create new repo" }),
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "text",
+            value: newRepoName,
+            onChange: (e) => setNewRepoName(e.target.value),
+            placeholder: "my-project",
+            className: "w-full bg-[#1E1E1E] text-white text-xs rounded-md px-3 py-2 border border-[#2F2F2F] focus:outline-none focus:border-[#9E7FFF]/50"
+          }
+        )
+      ] }),
+      repoUrl.trim() && /* @__PURE__ */ jsxs(Fragment, { children: [
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx("label", { className: "text-xs text-[#A3A3A3]", children: "Branch (default: main)" }),
+          /* @__PURE__ */ jsx(
+            "input",
+            {
+              type: "text",
+              value: branch,
+              onChange: (e) => setBranch(e.target.value),
+              placeholder: "main",
+              className: "w-full bg-[#1E1E1E] text-white text-xs rounded-md px-3 py-2 border border-[#2F2F2F] focus:outline-none focus:border-[#9E7FFF]/50"
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+          /* @__PURE__ */ jsx("label", { className: "text-xs text-[#A3A3A3]", children: "New branch (optional)" }),
+          /* @__PURE__ */ jsx(
+            "input",
+            {
+              type: "text",
+              value: newBranch,
+              onChange: (e) => setNewBranch(e.target.value),
+              placeholder: "feature/my-change",
+              className: "w-full bg-[#1E1E1E] text-white text-xs rounded-md px-3 py-2 border border-[#2F2F2F] focus:outline-none focus:border-[#9E7FFF]/50"
+            }
+          )
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "space-y-1", children: [
+        /* @__PURE__ */ jsx("label", { className: "text-xs text-[#A3A3A3]", children: "Commit message" }),
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "text",
+            value: commitMessage,
+            onChange: (e) => setCommitMessage(e.target.value),
+            placeholder: "Update from Coderion",
+            className: "w-full bg-[#1E1E1E] text-white text-xs rounded-md px-3 py-2 border border-[#2F2F2F] focus:outline-none focus:border-[#9E7FFF]/50"
+          }
+        )
+      ] }),
+      newBranch.trim() && /* @__PURE__ */ jsxs("label", { className: "flex items-center gap-2 text-xs text-[#A3A3A3] cursor-pointer", children: [
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "checkbox",
+            checked: openPR,
+            onChange: (e) => setOpenPR(e.target.checked),
+            className: "accent-[#9E7FFF]"
+          }
+        ),
+        "Open Pull Request"
+      ] }),
+      newRepoName.trim() && !repoUrl.trim() && /* @__PURE__ */ jsxs("label", { className: "flex items-center gap-2 text-xs text-[#A3A3A3] cursor-pointer", children: [
+        /* @__PURE__ */ jsx(
+          "input",
+          {
+            type: "checkbox",
+            checked: isPrivate,
+            onChange: (e) => setIsPrivate(e.target.checked),
+            className: "accent-[#9E7FFF]"
+          }
+        ),
+        "Private repo"
+      ] }),
+      /* @__PURE__ */ jsx(
+        "button",
+        {
+          onClick: handlePush,
+          disabled: busy || !repoUrl.trim() && !newRepoName.trim(),
+          className: "w-full bg-[#9E7FFF] text-white text-xs font-medium rounded-md px-3 py-2 hover:bg-[#8B6EE6] transition-colors disabled:opacity-50",
+          children: busy ? "Pushing..." : "Push files"
+        }
+      )
+    ] }),
+    error && /* @__PURE__ */ jsx("div", { className: "bg-red-500/10 border border-red-500/30 text-red-400 rounded-md px-3 py-2 text-xs", children: error }),
+    success && /* @__PURE__ */ jsx("div", { className: "bg-green-500/10 border border-green-500/30 text-green-400 rounded-md px-3 py-2 text-xs", children: success })
+  ] });
+}
+function ProjectWorkspace({
+  projectId,
+  projectTitle,
+  initialMessages,
+  initialFiles,
+  models,
+  initialPrompt
+}) {
+  var _a;
+  const [messages, setMessages] = useState(initialMessages || []);
+  const [files, setFiles] = useState(initialFiles || []);
+  const [input, setInput] = useState("");
+  const [isSending, setIsSending] = useState(false);
+  const [error, setError] = useState(null);
+  const [streamingContent, setStreamingContent] = useState("");
+  const [selectedModelId, setSelectedModelId] = useState(
+    ((_a = models[0]) == null ? void 0 : _a.id) || ""
+  );
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [panelView, setPanelView] = useState("split");
+  const [showChat, setShowChat] = useState(true);
+  const messagesEndRef = useRef(null);
+  useEffect(() => {
+    var _a2;
+    (_a2 = messagesEndRef.current) == null ? void 0 : _a2.scrollIntoView({ behavior: "smooth" });
+  }, [messages, streamingContent]);
+  useEffect(() => {
+    if (files.length > 0 && !selectedFile) {
+      setSelectedFile(files[0]);
+    }
+  }, [files, selectedFile]);
+  useEffect(() => {
+    if (initialPrompt && initialPrompt.trim() && messages.length === 0 && !isSending) {
+      setInput(initialPrompt);
+      const timer = setTimeout(() => {
+        handleSendMessage();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [initialPrompt]);
+  const refreshFiles = useCallback(async () => {
+    const freshFiles = await getProjectFiles(projectId);
+    setFiles(freshFiles);
+    if (freshFiles.length > 0) {
+      const current = freshFiles.find((f) => f.id === (selectedFile == null ? void 0 : selectedFile.id));
+      if (current) setSelectedFile(current);
+      else if (!selectedFile) setSelectedFile(freshFiles[0]);
+    }
+  }, [projectId, selectedFile]);
+  async function handleSendMessage(e) {
+    var _a2;
+    e == null ? void 0 : e.preventDefault();
+    const trimmed = input.trim();
+    if (!trimmed || isSending) return;
+    const userMessage = {
+      role: "user",
+      content: trimmed,
+      timestamp: (/* @__PURE__ */ new Date()).toISOString()
+    };
+    setInput("");
+    setIsSending(true);
+    setError(null);
+    setStreamingContent("");
+    const optimisticMessages = [...messages, userMessage];
+    setMessages(optimisticMessages);
+    try {
+      const response = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          projectId,
+          messages: optimisticMessages,
+          modelId: selectedModelId || void 0
+        })
+      });
+      if (!response.ok) {
+        const data = await response.json();
+        setError((data == null ? void 0 : data.error) || "Error sending message.");
+        setMessages(messages);
+        return;
+      }
+      const reader = (_a2 = response.body) == null ? void 0 : _a2.getReader();
+      const decoder = new TextDecoder();
+      let accumulated = "";
+      let filesGenerated = 0;
+      while (reader) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n");
+        for (const line of lines) {
+          if (line.startsWith("data: ")) {
+            const jsonStr = line.slice(6);
+            if (!jsonStr.trim()) continue;
+            try {
+              const data = JSON.parse(jsonStr);
+              if (data.type === "token") {
+                accumulated += data.content;
+                setStreamingContent(accumulated);
+              } else if (data.type === "done") {
+                const assistantMessage = {
+                  role: "assistant",
+                  content: data.content || accumulated,
+                  timestamp: (/* @__PURE__ */ new Date()).toISOString()
+                };
+                setMessages([...optimisticMessages, assistantMessage]);
+                setStreamingContent("");
+                filesGenerated = data.filesGenerated || 0;
+                if (filesGenerated > 0) {
+                  await refreshFiles();
+                }
+              } else if (data.type === "error") {
+                setError(data.error || "AI service error.");
+                setMessages(messages);
+              }
+            } catch {
+            }
+          }
+        }
+      }
+    } catch {
+      setError("Connection error. Try again.");
+      setMessages(messages);
+    } finally {
+      setIsSending(false);
+      setStreamingContent("");
+    }
+  }
+  function handleKeyDown(e) {
+    if (e.key === "Enter" && !e.shiftKey) {
+      e.preventDefault();
+      handleSendMessage();
+    }
+  }
+  async function handleDeleteFile(fileId) {
+    const success = await deleteProjectFile(fileId);
+    if (success) {
+      setFiles((prev) => prev.filter((f) => f.id !== fileId));
+      if ((selectedFile == null ? void 0 : selectedFile.id) === fileId) {
+        setSelectedFile(null);
+      }
+    }
+  }
+  function handleContentChange(fileId, content) {
+    setFiles(
+      (prev) => prev.map((f) => f.id === fileId ? { ...f, content } : f)
+    );
+    if ((selectedFile == null ? void 0 : selectedFile.id) === fileId) {
+      setSelectedFile((prev) => prev ? { ...prev, content } : prev);
+    }
+  }
+  const selectedModel = models.find((m) => m.id === selectedModelId);
+  return /* @__PURE__ */ jsxs("div", { className: "flex-1 flex flex-col h-full", children: [
+    /* @__PURE__ */ jsxs("div", { className: "border-b border-[#2F2F2F] px-4 py-2.5 flex items-center justify-between flex-shrink-0", children: [
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3", children: [
+        /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold text-white truncate max-w-[200px]", children: projectTitle }),
+        files.length > 0 && /* @__PURE__ */ jsxs("span", { className: "text-xs px-2 py-0.5 rounded-full bg-[#9E7FFF]/20 text-[#9E7FFF]", children: [
+          files.length,
+          " ",
+          files.length === 1 ? "file" : "files"
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
+        /* @__PURE__ */ jsxs("div", { className: "flex bg-[#262626] rounded-lg p-0.5", children: [
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              onClick: () => setPanelView("editor"),
+              className: `text-xs px-2.5 py-1 rounded-md transition-colors ${panelView === "editor" ? "bg-[#3F3F3F] text-white" : "text-[#A3A3A3] hover:text-white"}`,
+              title: "Editor only",
+              children: /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 17V7h6v10H9z" }) })
+            }
+          ),
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              onClick: () => setPanelView("split"),
+              className: `text-xs px-2.5 py-1 rounded-md transition-colors ${panelView === "split" ? "bg-[#3F3F3F] text-white" : "text-[#A3A3A3] hover:text-white"}`,
+              title: "Editor + preview",
+              children: /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M9 17V7H3v10h6zM21 17V7h-6v10h6z" }) })
+            }
+          ),
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              onClick: () => setPanelView("preview"),
+              className: `text-xs px-2.5 py-1 rounded-md transition-colors ${panelView === "preview" ? "bg-[#3F3F3F] text-white" : "text-[#A3A3A3] hover:text-white"}`,
+              title: "Preview only",
+              children: /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z" }) })
+            }
+          )
+        ] }),
+        /* @__PURE__ */ jsx(
+          "button",
+          {
+            onClick: () => setShowChat(!showChat),
+            className: `text-xs px-2.5 py-1.5 rounded-lg transition-colors ${showChat ? "bg-[#9E7FFF]/10 text-[#9E7FFF]" : "bg-[#262626] text-[#A3A3A3] hover:text-white"}`,
+            title: "Show/hide chat",
+            children: /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" }) })
+          }
+        ),
+        /* @__PURE__ */ jsxs("div", { className: "relative", children: [
+          /* @__PURE__ */ jsxs(
+            "button",
+            {
+              onClick: () => setShowModelDropdown(!showModelDropdown),
+              className: "flex items-center gap-1.5 text-xs text-white bg-[#262626] rounded-lg px-2.5 py-1.5 hover:bg-[#2F2F2F] transition-colors",
+              children: [
+                /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5 text-[#9E7FFF]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M3 13a2 2 0 00-2 2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2M3 13a2 2 0 002 2h14a2 2 0 002-2" }) }),
+                (selectedModel == null ? void 0 : selectedModel.name) || "Model",
+                /* @__PURE__ */ jsx("svg", { className: "w-3 h-3 text-[#A3A3A3]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 9l-7 7-7-7" }) })
+              ]
+            }
+          ),
+          showModelDropdown && /* @__PURE__ */ jsxs(Fragment, { children: [
+            /* @__PURE__ */ jsx("div", { className: "fixed inset-0 z-10", onClick: () => setShowModelDropdown(false) }),
+            /* @__PURE__ */ jsx("div", { className: "absolute top-full right-0 mt-1 z-20 w-56 bg-[#262626] rounded-lg ring-1 ring-[#2F2F2F] shadow-xl py-1", children: models.map((model) => /* @__PURE__ */ jsxs(
+              "button",
+              {
+                onClick: () => {
+                  setSelectedModelId(model.id);
+                  setShowModelDropdown(false);
+                },
+                className: `w-full flex items-center justify-between px-3 py-2 text-xs transition-colors ${model.id === selectedModelId ? "bg-[#9E7FFF]/10 text-white" : "text-[#A3A3A3] hover:bg-[#2F2F2F] hover:text-white"}`,
+                children: [
+                  /* @__PURE__ */ jsx("span", { children: model.name }),
+                  model.badge && /* @__PURE__ */ jsx("span", { className: "text-xs px-1.5 py-0.5 rounded-full bg-[#9E7FFF]/20 text-[#9E7FFF]", children: model.badge })
+                ]
+              },
+              model.id
+            )) })
+          ] })
+        ] })
+      ] })
+    ] }),
+    /* @__PURE__ */ jsxs("div", { className: "flex-1 flex overflow-hidden", children: [
+      /* @__PURE__ */ jsxs("div", { className: "w-56 border-r border-[#2F2F2F] bg-[#1E1E1E] flex-shrink-0 overflow-hidden flex flex-col", children: [
+        /* @__PURE__ */ jsx("div", { className: "px-3 py-2 border-b border-[#2F2F2F]", children: /* @__PURE__ */ jsx("span", { className: "text-xs font-medium text-[#A3A3A3] uppercase tracking-wider", children: "Files" }) }),
+        /* @__PURE__ */ jsx("div", { className: "flex-1 overflow-y-auto", children: /* @__PURE__ */ jsx(
+          FileTree,
+          {
+            files,
+            selectedFile,
+            onSelectFile: setSelectedFile,
+            onDeleteFile: handleDeleteFile
+          }
+        ) }),
+        /* @__PURE__ */ jsxs("div", { className: "border-t border-[#2F2F2F]", children: [
+          /* @__PURE__ */ jsx("div", { className: "px-3 py-2", children: /* @__PURE__ */ jsx("span", { className: "text-xs font-medium text-[#A3A3A3] uppercase tracking-wider", children: "GitHub" }) }),
+          /* @__PURE__ */ jsx(GitHubPanel, { projectId, onImported: refreshFiles })
+        ] })
+      ] }),
+      /* @__PURE__ */ jsxs("div", { className: "flex-1 flex overflow-hidden", children: [
+        panelView !== "preview" && /* @__PURE__ */ jsx("div", { className: `${panelView === "split" ? "w-1/2" : "w-full"} flex flex-col overflow-hidden border-r border-[#2F2F2F]`, children: /* @__PURE__ */ jsx(CodeEditor, { file: selectedFile, onContentChange: handleContentChange }) }),
+        panelView !== "editor" && /* @__PURE__ */ jsx("div", { className: `${panelView === "split" ? "w-1/2" : "w-full"} flex flex-col overflow-hidden`, children: /* @__PURE__ */ jsx(LivePreview, { files }) })
+      ] }),
+      showChat && /* @__PURE__ */ jsxs("div", { className: "w-80 border-l border-[#2F2F2F] bg-[#1E1E1E] flex-shrink-0 flex flex-col overflow-hidden", children: [
+        /* @__PURE__ */ jsx("div", { className: "px-3 py-2 border-b border-[#2F2F2F]", children: /* @__PURE__ */ jsx("span", { className: "text-xs font-medium text-[#A3A3A3] uppercase tracking-wider", children: "AI Chat" }) }),
+        /* @__PURE__ */ jsxs("div", { className: "flex-1 overflow-y-auto px-3 py-3 space-y-3", children: [
+          messages.length === 0 && !streamingContent && /* @__PURE__ */ jsxs("div", { className: "flex flex-col items-center justify-center h-full text-center px-2", children: [
+            /* @__PURE__ */ jsx("svg", { className: "w-10 h-10 text-[#3F3F3F] mb-2", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 1.5, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" }) }),
+            /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3]", children: "Describe the project you want to create" })
+          ] }),
+          messages.map((message, index) => /* @__PURE__ */ jsx(
+            "div",
+            {
+              className: `flex ${message.role === "user" ? "justify-end" : "justify-start"}`,
+              children: /* @__PURE__ */ jsx(
+                "div",
+                {
+                  className: `max-w-[90%] rounded-xl px-3 py-2 ${message.role === "user" ? "bg-[#9E7FFF] text-white" : "bg-[#262626] text-white ring-1 ring-[#2F2F2F]"}`,
+                  children: /* @__PURE__ */ jsx("p", { className: "whitespace-pre-wrap text-xs leading-relaxed", children: message.content })
+                }
+              )
+            },
+            index
+          )),
+          streamingContent && /* @__PURE__ */ jsx("div", { className: "flex justify-start", children: /* @__PURE__ */ jsx("div", { className: "max-w-[90%] rounded-xl px-3 py-2 bg-[#262626] text-white ring-1 ring-[#2F2F2F]", children: /* @__PURE__ */ jsxs("p", { className: "whitespace-pre-wrap text-xs leading-relaxed", children: [
+            streamingContent,
+            /* @__PURE__ */ jsx("span", { className: "inline-block w-1 h-3 bg-[#9E7FFF] ml-0.5 animate-pulse" })
+          ] }) }) }),
+          isSending && !streamingContent && /* @__PURE__ */ jsx("div", { className: "flex justify-start", children: /* @__PURE__ */ jsx("div", { className: "bg-[#262626] rounded-xl px-3 py-2 ring-1 ring-[#2F2F2F]", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1.5", children: [
+            /* @__PURE__ */ jsx("div", { className: "w-1.5 h-1.5 bg-[#9E7FFF] rounded-full animate-bounce" }),
+            /* @__PURE__ */ jsx("div", { className: "w-1.5 h-1.5 bg-[#9E7FFF] rounded-full animate-bounce", style: { animationDelay: "0.1s" } }),
+            /* @__PURE__ */ jsx("div", { className: "w-1.5 h-1.5 bg-[#9E7FFF] rounded-full animate-bounce", style: { animationDelay: "0.2s" } })
+          ] }) }) }),
+          /* @__PURE__ */ jsx("div", { ref: messagesEndRef })
+        ] }),
+        error && /* @__PURE__ */ jsx("div", { className: "px-3 pb-2", children: /* @__PURE__ */ jsx("div", { className: "bg-red-500/10 border border-red-500/30 text-red-400 rounded-lg px-3 py-2 text-xs", children: error }) }),
+        /* @__PURE__ */ jsx("div", { className: "border-t border-[#2F2F2F] p-3", children: /* @__PURE__ */ jsx("form", { onSubmit: handleSendMessage, children: /* @__PURE__ */ jsxs("div", { className: "flex items-end gap-2 bg-[#262626] rounded-xl ring-1 ring-[#2F2F2F] p-2 focus-within:ring-[#9E7FFF]/50 transition-all", children: [
+          /* @__PURE__ */ jsx(
+            "textarea",
+            {
+              value: input,
+              onChange: (e) => setInput(e.target.value),
+              onKeyDown: handleKeyDown,
+              placeholder: "Describe your project...",
+              disabled: isSending,
+              rows: 1,
+              className: "flex-1 bg-transparent text-white placeholder-[#A3A3A3] resize-none focus:outline-none disabled:opacity-50 text-xs leading-relaxed",
+              style: { minHeight: "20px", maxHeight: "80px" }
+            }
+          ),
+          /* @__PURE__ */ jsx(
+            "button",
+            {
+              type: "submit",
+              disabled: !input.trim() || isSending,
+              className: "flex-shrink-0 bg-[#9E7FFF] text-white rounded-lg p-1.5 hover:bg-[#8B6EE6] focus:outline-none transition-all disabled:opacity-50 disabled:cursor-not-allowed",
+              "aria-label": "Send",
+              children: isSending ? /* @__PURE__ */ jsxs("svg", { className: "w-3.5 h-3.5 animate-spin", fill: "none", viewBox: "0 0 24 24", children: [
+                /* @__PURE__ */ jsx("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
+                /* @__PURE__ */ jsx("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" })
+              ] }) : /* @__PURE__ */ jsx("svg", { className: "w-3.5 h-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 19l9 2-9-18-9 18 9-2zm0 0v-8" }) })
+            }
+          )
+        ] }) }) })
+      ] })
+    ] })
+  ] });
+}
 const meta$8 = () => [
-  { title: `${APP_NAME} - Proyecto` }
+  { title: `${APP_NAME} - Project` }
 ];
 async function loader$a({ request, params }) {
   const { supabase: supabase2, headers } = createSupabaseServerClient(request);
@@ -474,7 +1748,7 @@ async function getTreeBlobs(token, owner, repo, branch) {
       }
     }
   );
-  if (!treeRes.ok) throw new Error("No se pudo leer el arbol del repo");
+  if (!treeRes.ok) throw new Error("Could not read repo tree");
   const treeData = await treeRes.json();
   const blobs = (treeData.tree || []).filter(
     (item) => item.type === "blob" && item.path
@@ -527,31 +1801,31 @@ async function action$a({ request }) {
     data: { user }
   } = await supabase2.auth.getUser();
   if (!user) {
-    return Response.json({ error: "No autenticado" }, { status: 401, headers });
+    return Response.json({ error: "Not authenticated" }, { status: 401, headers });
   }
   let body;
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Cuerpo invalido" }, { status: 400, headers });
+    return Response.json({ error: "Invalid body" }, { status: 400, headers });
   }
   const { projectId, repoUrl } = body;
   if (!projectId || !repoUrl) {
-    return Response.json({ error: "Faltan parametros" }, { status: 400, headers });
+    return Response.json({ error: "Missing parameters" }, { status: 400, headers });
   }
   const { data: project, error: projectError } = await supabase2.from("projects").select("id, user_id").eq("id", projectId).eq("user_id", user.id).maybeSingle();
   if (projectError || !project) {
-    return Response.json({ error: "Proyecto no encontrado" }, { status: 404, headers });
+    return Response.json({ error: "Project not found" }, { status: 404, headers });
   }
   const serviceClient = createSupabaseServiceClient();
   const { data: ghConn, error: ghError } = await serviceClient.from("github_connections").select("github_access_token, github_username").eq("user_id", user.id).maybeSingle();
   if (ghError || !ghConn) {
-    return Response.json({ error: "Cuenta de GitHub no conectada" }, { status: 403, headers });
+    return Response.json({ error: "GitHub account not connected" }, { status: 403, headers });
   }
   const token = ghConn.github_access_token;
   const match = repoUrl.match(/github\.com\/([^/]+)\/([^/.]+(?:\.git)?)$/);
   if (!match) {
-    return Response.json({ error: "URL de repo invalida" }, { status: 400, headers });
+    return Response.json({ error: "Invalid repo URL" }, { status: 400, headers });
   }
   const owner = match[1];
   const repo = match[2].replace(/\.git$/, "");
@@ -564,13 +1838,13 @@ async function action$a({ request }) {
       }
     });
   } catch {
-    return Response.json({ error: "No se pudo acceder al repo" }, { status: 502, headers });
+    return Response.json({ error: "Could not access repo" }, { status: 502, headers });
   }
   if (!repoInfo.ok) {
     if (repoInfo.status === 404) {
-      return Response.json({ error: "Repo no encontrado o sin acceso" }, { status: 404, headers });
+      return Response.json({ error: "Repo not found or no access" }, { status: 404, headers });
     }
-    return Response.json({ error: "Error al acceder al repo" }, { status: 502, headers });
+    return Response.json({ error: "Error accessing repo" }, { status: 502, headers });
   }
   const repoData = await repoInfo.json();
   const branch = repoData.default_branch || "main";
@@ -579,12 +1853,12 @@ async function action$a({ request }) {
     files = await getTreeBlobs(token, owner, repo, branch);
   } catch (err) {
     return Response.json(
-      { error: err instanceof Error ? err.message : "Error al leer archivos" },
+      { error: err instanceof Error ? err.message : "Error reading files" },
       { status: 502, headers }
     );
   }
   if (files.length === 0) {
-    return Response.json({ error: "El repo no tiene archivos importables" }, { status: 400, headers });
+    return Response.json({ error: "Repo has no importable files" }, { status: 400, headers });
   }
   let importedCount = 0;
   for (const file of files) {
@@ -630,7 +1904,7 @@ async function createBlob(token, owner, repo, content) {
     },
     body: JSON.stringify({ content, encoding: "utf-8" })
   });
-  if (!res.ok) throw new Error("No se pudo crear blob");
+  if (!res.ok) throw new Error("Could not create blob");
   const data = await res.json();
   return data.sha;
 }
@@ -661,7 +1935,7 @@ async function createTree(token, owner, repo, baseTreeSha, treeItems) {
     },
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error("No se pudo crear el arbol");
+  if (!res.ok) throw new Error("Could not create tree");
   const data = await res.json();
   return data.sha;
 }
@@ -677,7 +1951,7 @@ async function createCommit(token, owner, repo, message, treeSha, parentSha) {
     },
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error("No se pudo crear el commit");
+  if (!res.ok) throw new Error("Could not create commit");
   const data = await res.json();
   return data.sha;
 }
@@ -696,7 +1970,7 @@ async function updateRef(token, owner, repo, branch, sha) {
   );
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || "No se pudo actualizar la rama");
+    throw new Error(err.message || "Could not update branch");
   }
 }
 async function createBranch(token, owner, repo, newBranch, fromSha) {
@@ -714,7 +1988,7 @@ async function createBranch(token, owner, repo, newBranch, fromSha) {
   );
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || "No se pudo crear la rama");
+    throw new Error(err.message || "Could not create branch");
   }
 }
 async function createPullRequest(token, owner, repo, head, base, title, body) {
@@ -743,7 +2017,7 @@ async function createRepo(token, name, isPrivate) {
   });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
-    throw new Error(err.message || "No se pudo crear el repo");
+    throw new Error(err.message || "Could not create repo");
   }
   const data = await res.json();
   return {
@@ -762,35 +2036,35 @@ async function action$9({ request }) {
     data: { user }
   } = await supabase2.auth.getUser();
   if (!user) {
-    return Response.json({ error: "No autenticado" }, { status: 401, headers });
+    return Response.json({ error: "Not authenticated" }, { status: 401, headers });
   }
   let body;
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Cuerpo invalido" }, { status: 400, headers });
+    return Response.json({ error: "Invalid body" }, { status: 400, headers });
   }
   const { projectId, repoUrl, newRepoName, branch, newBranch, commitMessage, openPR, isPrivate } = body;
   if (!projectId) {
-    return Response.json({ error: "Falta projectId" }, { status: 400, headers });
+    return Response.json({ error: "Missing projectId" }, { status: 400, headers });
   }
   if (!repoUrl && !newRepoName) {
-    return Response.json({ error: "Especifica un repo o un nombre para crear uno nuevo" }, { status: 400, headers });
+    return Response.json({ error: "Specify a repo or a name to create a new one" }, { status: 400, headers });
   }
   const { data: project, error: projectError } = await supabase2.from("projects").select("id, user_id, title").eq("id", projectId).eq("user_id", user.id).maybeSingle();
   if (projectError || !project) {
-    return Response.json({ error: "Proyecto no encontrado" }, { status: 404, headers });
+    return Response.json({ error: "Project not found" }, { status: 404, headers });
   }
   const serviceClient = createSupabaseServiceClient();
   const { data: ghConn, error: ghError } = await serviceClient.from("github_connections").select("github_access_token, github_username").eq("user_id", user.id).maybeSingle();
   if (ghError || !ghConn) {
-    return Response.json({ error: "Cuenta de GitHub no conectada" }, { status: 403, headers });
+    return Response.json({ error: "GitHub account not connected" }, { status: 403, headers });
   }
   const token = ghConn.github_access_token;
   ghConn.github_username;
   const { data: dbFiles, error: filesError } = await supabase2.from("project_files").select("*").eq("project_id", projectId).order("path", { ascending: true });
   if (filesError || !dbFiles || dbFiles.length === 0) {
-    return Response.json({ error: "No hay archivos para exportar" }, { status: 400, headers });
+    return Response.json({ error: "No files to export" }, { status: 400, headers });
   }
   const files = dbFiles;
   let owner;
@@ -806,14 +2080,14 @@ async function action$9({ request }) {
       targetBranch = created.defaultBranch;
     } catch (err) {
       return Response.json(
-        { error: err instanceof Error ? err.message : "Error al crear repo" },
+        { error: err instanceof Error ? err.message : "Error creating repo" },
         { status: 502, headers }
       );
     }
   } else {
     const match = repoUrl.match(/github\.com\/([^/]+)\/([^/.]+(?:\.git)?)$/);
     if (!match) {
-      return Response.json({ error: "URL de repo invalida" }, { status: 400, headers });
+      return Response.json({ error: "Invalid repo URL" }, { status: 400, headers });
     }
     owner = match[1];
     repo = match[2].replace(/\.git$/, "");
@@ -864,9 +2138,9 @@ async function action$9({ request }) {
         targetBranch,
         baseBranchForPR,
         `Update from Coderion: ${project.title}`,
-        `Archivos actualizados desde Coderion.
+        `Files updated from Coderion.
 
-${files.length} archivos subidos.`
+${files.length} files pushed.`
       );
     }
     return Response.json(
@@ -882,7 +2156,7 @@ ${files.length} archivos subidos.`
     );
   } catch (err) {
     return Response.json(
-      { error: err instanceof Error ? err.message : "Error al subir archivos" },
+      { error: err instanceof Error ? err.message : "Error pushing files" },
       { status: 502, headers }
     );
   }
@@ -925,9 +2199,9 @@ async function requireAdmin(request) {
 const NAV_ITEMS = [
   { path: "/admin", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
   { path: "/admin/settings", label: "API Keys", icon: "M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-4.07a1 1 0 01.49-.86l5.07-2.93A6 6 0 1121 9z" },
-  { path: "/admin/models", label: "Modelos IA", icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M3 13a2 2 0 00-2 2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2M3 13a2 2 0 002 2h14a2 2 0 002-2" },
-  { path: "/admin/users", label: "Usuarios", icon: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a4 4 0 11-8 0 4 4 0 018 0z" },
-  { path: "/admin/projects", label: "Proyectos", icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" }
+  { path: "/admin/models", label: "AI Models", icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M3 13a2 2 0 00-2 2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2M3 13a2 2 0 002 2h14a2 2 0 002-2" },
+  { path: "/admin/users", label: "Users", icon: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a4 4 0 11-8 0 4 4 0 018 0z" },
+  { path: "/admin/projects", label: "Projects", icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" }
 ];
 function AdminLayout({ children, adminEmail }) {
   const location = useLocation();
@@ -959,7 +2233,7 @@ function AdminLayout({ children, adminEmail }) {
       /* @__PURE__ */ jsxs("div", { className: "border-t border-[#2F2F2F] px-3 py-4 space-y-2", children: [
         /* @__PURE__ */ jsxs("div", { className: "rounded-lg bg-[#262626] px-3 py-2", children: [
           /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3] truncate", children: adminEmail }),
-          /* @__PURE__ */ jsx("p", { className: "text-[10px] text-green-400 mt-0.5", children: "Administrador" })
+          /* @__PURE__ */ jsx("p", { className: "text-[10px] text-green-400 mt-0.5", children: "Administrator" })
         ] }),
         /* @__PURE__ */ jsxs(
           Link,
@@ -968,7 +2242,7 @@ function AdminLayout({ children, adminEmail }) {
             className: "flex items-center gap-2 text-xs text-[#A3A3A3] hover:text-white transition-colors px-3 py-1.5",
             children: [
               /* @__PURE__ */ jsx("svg", { className: "h-3.5 w-3.5", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M10 19l-7-7m0 0l7-7m-7 7h18" }) }),
-              "Volver a la app"
+              "Back to app"
             ]
           }
         )
@@ -978,7 +2252,7 @@ function AdminLayout({ children, adminEmail }) {
   ] });
 }
 const meta$7 = () => [
-  { title: `${APP_NAME} - Admin · Proyectos` }
+  { title: `${APP_NAME} - Admin · Projects` }
 ];
 async function loader$9({ request }) {
   const result = await requireAdmin(request);
@@ -1004,7 +2278,7 @@ async function loader$9({ request }) {
     model_id: p.model_id,
     created_at: p.created_at,
     updated_at: p.updated_at,
-    user_email: emailMap[p.user_id] || "Desconocido",
+    user_email: emailMap[p.user_id] || "Unknown",
     file_count: fileCountMap[p.id] || 0
   }));
   return Response.json({
@@ -1016,35 +2290,35 @@ function AdminProjects() {
   const data = useLoaderData();
   return /* @__PURE__ */ jsxs(AdminLayout, { adminEmail: data.adminEmail, children: [
     /* @__PURE__ */ jsxs("div", { className: "mb-8", children: [
-      /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-white", children: "Proyectos" }),
+      /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-white", children: "Projects" }),
       /* @__PURE__ */ jsxs("p", { className: "text-sm text-[#A3A3A3] mt-1", children: [
         data.projects.length,
-        " proyectos en total."
+        " projects in total."
       ] })
     ] }),
     /* @__PURE__ */ jsx("div", { className: "rounded-2xl bg-[#262626] ring-1 ring-[#2F2F2F] overflow-hidden", children: /* @__PURE__ */ jsxs("table", { className: "w-full", children: [
       /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F]", children: [
-        /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Título" }),
-        /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Usuario" }),
-        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Archivos" }),
-        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Modelo" }),
-        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Estado" }),
-        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Actualizado" }),
+        /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Title" }),
+        /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "User" }),
+        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Files" }),
+        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Model" }),
+        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Status" }),
+        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Updated" }),
         /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3" })
       ] }) }),
-      /* @__PURE__ */ jsx("tbody", { children: data.projects.length === 0 ? /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 7, className: "text-center text-sm text-[#A3A3A3] py-8", children: "No hay proyectos." }) }) : data.projects.map((project) => /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F] last:border-0", children: [
+      /* @__PURE__ */ jsx("tbody", { children: data.projects.length === 0 ? /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 7, className: "text-center text-sm text-[#A3A3A3] py-8", children: "No projects." }) }) : data.projects.map((project) => /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F] last:border-0", children: [
         /* @__PURE__ */ jsx("td", { className: "px-5 py-3", children: /* @__PURE__ */ jsx("span", { className: "text-sm text-white truncate max-w-[200px] block", children: project.title }) }),
         /* @__PURE__ */ jsx("td", { className: "px-5 py-3", children: /* @__PURE__ */ jsx("span", { className: "text-xs text-[#A3A3A3]", children: project.user_email }) }),
         /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: /* @__PURE__ */ jsx("span", { className: "text-sm text-[#A3A3A3]", children: project.file_count }) }),
         /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: /* @__PURE__ */ jsx("span", { className: "text-xs text-[#A3A3A3] font-mono truncate max-w-[150px] block", children: project.model_id || "—" }) }),
-        /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: project.status === "active" ? /* @__PURE__ */ jsx("span", { className: "text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400", children: "Activo" }) : /* @__PURE__ */ jsx("span", { className: "text-xs px-2 py-0.5 rounded-full bg-[#3F3F3F] text-[#A3A3A3]", children: "Archivado" }) }),
-        /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: /* @__PURE__ */ jsx("span", { className: "text-xs text-[#A3A3A3]", children: new Date(project.updated_at).toLocaleDateString("es-ES", { day: "numeric", month: "short" }) }) }),
+        /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: project.status === "active" ? /* @__PURE__ */ jsx("span", { className: "text-xs px-2 py-0.5 rounded-full bg-green-500/10 text-green-400", children: "Active" }) : /* @__PURE__ */ jsx("span", { className: "text-xs px-2 py-0.5 rounded-full bg-[#3F3F3F] text-[#A3A3A3]", children: "Archived" }) }),
+        /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: /* @__PURE__ */ jsx("span", { className: "text-xs text-[#A3A3A3]", children: new Date(project.updated_at).toLocaleDateString("en-US", { day: "numeric", month: "short" }) }) }),
         /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: /* @__PURE__ */ jsx(
           Link,
           {
             to: `/project/${project.id}`,
             className: "text-xs text-[#9E7FFF] hover:underline",
-            children: "Abrir →"
+            children: "Open →"
           }
         ) })
       ] }, project.id)) })
@@ -1061,8 +2335,8 @@ const meta$6 = () => [
   { title: `${APP_NAME} - Admin · API Keys` }
 ];
 const CATEGORY_LABELS = {
-  ai: "Inteligencia Artificial",
-  stripe: "Pagos (Stripe)",
+  ai: "Artificial Intelligence",
+  stripe: "Payments (Stripe)",
   github: "GitHub OAuth",
   general: "General"
 };
@@ -1087,7 +2361,7 @@ async function action$8({ request }) {
     const key = String(formData.get("key") || "");
     const value = String(formData.get("value") || "");
     if (!key) {
-      return Response.json({ error: "Falta la clave" }, { status: 400, headers });
+      return Response.json({ error: "Missing the key" }, { status: 400, headers });
     }
     const { error } = await supabase2.from("app_settings").update({ value, updated_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("key", key);
     if (error) {
@@ -1102,7 +2376,7 @@ async function action$8({ request }) {
     const label = String(formData.get("label") || key);
     const is_secret = formData.get("is_secret") === "true";
     if (!key) {
-      return Response.json({ error: "Falta la clave" }, { status: 400, headers });
+      return Response.json({ error: "Missing the key" }, { status: 400, headers });
     }
     const { error } = await supabase2.from("app_settings").insert({ key, value, category, label, is_secret });
     if (error) {
@@ -1118,7 +2392,7 @@ async function action$8({ request }) {
     }
     return Response.json({ success: true }, { headers });
   }
-  return Response.json({ error: "Acción no reconocida" }, { status: 400, headers });
+  return Response.json({ error: "Unrecognized action" }, { status: 400, headers });
 }
 function AdminSettings() {
   const data = useLoaderData();
@@ -1131,22 +2405,22 @@ function AdminSettings() {
   })).filter((g) => g.items.length > 0);
   return /* @__PURE__ */ jsxs(AdminLayout, { adminEmail: data.adminEmail, children: [
     /* @__PURE__ */ jsxs("div", { className: "mb-8", children: [
-      /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-white", children: "API Keys y Configuración" }),
-      /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3] mt-1", children: "Gestiona las claves de los servicios externos. Los valores se guardan en la base de datos." })
+      /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-white", children: "API Keys and Configuration" }),
+      /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3] mt-1", children: "Manage external service keys. Values are stored in the database." })
     ] }),
     (actionData == null ? void 0 : actionData.error) && /* @__PURE__ */ jsx("div", { className: "mb-4 rounded-lg bg-red-500/10 border border-red-500/30 p-3", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-red-400", children: actionData.error }) }),
-    (actionData == null ? void 0 : actionData.success) && /* @__PURE__ */ jsx("div", { className: "mb-4 rounded-lg bg-green-500/10 border border-green-500/30 p-3", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-green-400", children: "Configuración guardada correctamente." }) }),
+    (actionData == null ? void 0 : actionData.success) && /* @__PURE__ */ jsx("div", { className: "mb-4 rounded-lg bg-green-500/10 border border-green-500/30 p-3", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-green-400", children: "Configuration saved successfully." }) }),
     settingsByCategory.map((group) => /* @__PURE__ */ jsxs("div", { className: "mb-6", children: [
       /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold text-white mb-3", children: CATEGORY_LABELS[group.category] || group.category }),
       /* @__PURE__ */ jsx("div", { className: "rounded-2xl bg-[#262626] ring-1 ring-[#2F2F2F] overflow-hidden", children: group.items.map((setting) => /* @__PURE__ */ jsx("div", { className: "border-b border-[#2F2F2F] last:border-0 px-5 py-4", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between gap-4", children: [
         /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1", children: [
           /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2 mb-1", children: [
             /* @__PURE__ */ jsx("span", { className: "text-sm text-white font-medium", children: setting.label }),
-            setting.is_secret && /* @__PURE__ */ jsx("span", { className: "text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 uppercase tracking-wider", children: "Secreto" }),
-            setting.value && setting.value.trim() !== "" ? /* @__PURE__ */ jsx("span", { className: "text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400", children: "Configurado" }) : /* @__PURE__ */ jsx("span", { className: "text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400", children: "Falta" })
+            setting.is_secret && /* @__PURE__ */ jsx("span", { className: "text-[10px] px-1.5 py-0.5 rounded bg-yellow-500/10 text-yellow-400 uppercase tracking-wider", children: "Secret" }),
+            setting.value && setting.value.trim() !== "" ? /* @__PURE__ */ jsx("span", { className: "text-[10px] px-1.5 py-0.5 rounded bg-green-500/10 text-green-400", children: "Configured" }) : /* @__PURE__ */ jsx("span", { className: "text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400", children: "Missing" })
           ] }),
           /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3] font-mono", children: setting.key }),
-          /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3] mt-1 font-mono truncate", children: setting.is_secret && setting.value ? `${setting.value.slice(0, 4)}${"•".repeat(12)}${setting.value.slice(-4)}` : setting.value || "Sin configurar" })
+          /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3] mt-1 font-mono truncate", children: setting.is_secret && setting.value ? `${setting.value.slice(0, 4)}${"•".repeat(12)}${setting.value.slice(-4)}` : setting.value || "Not configured" })
         ] }),
         /* @__PURE__ */ jsxs(Form, { method: "post", className: "flex items-center gap-2 flex-shrink-0", children: [
           /* @__PURE__ */ jsx("input", { type: "hidden", name: "intent", value: "update" }),
@@ -1157,7 +2431,7 @@ function AdminSettings() {
               name: "value",
               type: setting.is_secret ? "password" : "text",
               defaultValue: setting.value || "",
-              placeholder: setting.is_secret ? "••••••••" : "Valor",
+              placeholder: setting.is_secret ? "•••••••••" : "Value",
               className: "rounded-lg bg-[#1E1E1E] border border-[#2F2F2F] px-3 py-1.5 text-white text-xs font-mono focus:border-[#9E7FFF] focus:outline-none w-48"
             }
           ),
@@ -1167,7 +2441,7 @@ function AdminSettings() {
               type: "submit",
               disabled: isSubmitting,
               className: "rounded-lg bg-[#9E7FFF] text-white text-xs font-medium px-3 py-1.5 hover:bg-[#8B6EE6] transition-colors disabled:opacity-50",
-              children: "Guardar"
+              children: "Save"
             }
           )
         ] })
@@ -1189,7 +2463,7 @@ async function loader$7({ request }) {
   const { supabase: supabase2, headers } = createSupabaseServerClient(request);
   if (!code) {
     return new Response(
-      JSON.stringify({ error: "No se recibió el código de autenticación." }),
+      JSON.stringify({ error: "Authentication code not received." }),
       {
         status: 400,
         headers: { "Content-Type": "application/json", ...headers }
@@ -1220,7 +2494,7 @@ function AuthCallback() {
       /* @__PURE__ */ jsx("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
       /* @__PURE__ */ jsx("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" })
     ] }),
-    /* @__PURE__ */ jsx("p", { className: "mt-4 text-[#A3A3A3]", children: "Verificando autenticación..." })
+    /* @__PURE__ */ jsx("p", { className: "mt-4 text-[#A3A3A3]", children: "Verifying authentication..." })
   ] }) });
 }
 const route7 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
@@ -1230,8 +2504,8 @@ const route7 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
 }, Symbol.toStringTag, { value: "Module" }));
 const meta$5 = () => {
   return [
-    { title: `Crear cuenta | ${APP_NAME}` },
-    { name: "description", content: "Crea tu cuenta de Coderion y comienza a construir con IA." }
+    { title: `Create account | ${APP_NAME}` },
+    { name: "description", content: "Create your Coderion account and start building with AI." }
   ];
 };
 async function loader$6({ request }) {
@@ -1275,7 +2549,7 @@ async function action$7({ request }) {
   return Response.json(
     {
       success: true,
-      message: "Cuenta creada. Ya puedes iniciar sesión.",
+      message: "Account created. You can now log in.",
       redirectTo
     },
     { status: 200, headers }
@@ -1299,7 +2573,7 @@ function RegisterRoute() {
       setError(actionData.error);
     }
     if (actionData == null ? void 0 : actionData.success) {
-      setMessage(actionData.message || "Cuenta creada correctamente.");
+      setMessage(actionData.message || "Account created successfully.");
       const dest = actionData.redirectTo || redirectTo;
       const loginUrl = initialPrompt ? `/auth/login?redirectTo=${encodeURIComponent(dest)}&prompt=${encodeURIComponent(initialPrompt)}` : `/auth/login?redirectTo=${encodeURIComponent(dest)}`;
       setTimeout(() => {
@@ -1318,10 +2592,10 @@ function RegisterRoute() {
           /* @__PURE__ */ jsx("svg", { className: "w-8 h-8 text-[#9E7FFF]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M13 10V3L4 14h7v7l9-11h-7z" }) }),
           /* @__PURE__ */ jsx("span", { className: "text-2xl font-bold text-white tracking-tight", children: APP_NAME })
         ] }),
-        /* @__PURE__ */ jsx("h1", { className: "mt-6 text-3xl font-bold text-white tracking-tight", children: "Crea tu cuenta" }),
-        /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-[#A3A3A3]", children: "Comienza a construir con IA en minutos" }),
+        /* @__PURE__ */ jsx("h1", { className: "mt-6 text-3xl font-bold text-white tracking-tight", children: "Create your account" }),
+        /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-[#A3A3A3]", children: "Start building with AI in minutes" }),
         initialPrompt && /* @__PURE__ */ jsxs("div", { className: "mt-4 rounded-xl border border-[#9E7FFF]/30 bg-[#9E7FFF]/10 px-4 py-3 text-left", children: [
-          /* @__PURE__ */ jsx("p", { className: "text-xs font-medium text-[#9E7FFF] mb-1", children: "Tu idea:" }),
+          /* @__PURE__ */ jsx("p", { className: "text-xs font-medium text-[#9E7FFF] mb-1", children: "Your idea:" }),
           /* @__PURE__ */ jsx("p", { className: "text-sm text-white/80 line-clamp-3", children: initialPrompt })
         ] })
       ] }),
@@ -1330,7 +2604,7 @@ function RegisterRoute() {
         error && /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-[#ef4444]/10 border border-[#ef4444]/30 p-3", role: "alert", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-[#ef4444]", children: error }) }),
         message && /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-[#10b981]/10 border border-[#10b981]/30 p-3", role: "alert", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-[#10b981]", children: message }) }),
         /* @__PURE__ */ jsxs("div", { children: [
-          /* @__PURE__ */ jsx("label", { htmlFor: "fullName", className: "block text-sm font-medium text-[#A3A3A3] mb-1.5", children: "Nombre completo" }),
+          /* @__PURE__ */ jsx("label", { htmlFor: "fullName", className: "block text-sm font-medium text-[#A3A3A3] mb-1.5", children: "Full name" }),
           /* @__PURE__ */ jsx(
             "input",
             {
@@ -1340,13 +2614,13 @@ function RegisterRoute() {
               autoComplete: "name",
               value: fullName,
               onChange: (e) => setFullName(e.target.value),
-              placeholder: "Tu nombre",
+              placeholder: "Your name",
               className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-4 py-2.5 text-white placeholder-[#A3A3A3] focus:border-[#9E7FFF] focus:ring-2 focus:ring-[#9E7FFF]/20 focus:outline-none transition-colors"
             }
           )
         ] }),
         /* @__PURE__ */ jsxs("div", { children: [
-          /* @__PURE__ */ jsx("label", { htmlFor: "email", className: "block text-sm font-medium text-[#A3A3A3] mb-1.5", children: "Correo electrónico" }),
+          /* @__PURE__ */ jsx("label", { htmlFor: "email", className: "block text-sm font-medium text-[#A3A3A3] mb-1.5", children: "Email" }),
           /* @__PURE__ */ jsx(
             "input",
             {
@@ -1358,13 +2632,13 @@ function RegisterRoute() {
               required: true,
               value: email,
               onChange: (e) => setEmail(e.target.value),
-              placeholder: "tu@ejemplo.com",
+              placeholder: "you@example.com",
               className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-4 py-2.5 text-white placeholder-[#A3A3A3] focus:border-[#9E7FFF] focus:ring-2 focus:ring-[#9E7FFF]/20 focus:outline-none transition-colors"
             }
           )
         ] }),
         /* @__PURE__ */ jsxs("div", { children: [
-          /* @__PURE__ */ jsx("label", { htmlFor: "password", className: "block text-sm font-medium text-[#A3A3A3] mb-1.5", children: "Contraseña" }),
+          /* @__PURE__ */ jsx("label", { htmlFor: "password", className: "block text-sm font-medium text-[#A3A3A3] mb-1.5", children: "Password" }),
           /* @__PURE__ */ jsx(
             "input",
             {
@@ -1376,7 +2650,7 @@ function RegisterRoute() {
               minLength: 8,
               value: password,
               onChange: (e) => setPassword(e.target.value),
-              placeholder: "Mínimo 8 caracteres",
+              placeholder: "Minimum 8 characters",
               className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-4 py-2.5 text-white placeholder-[#A3A3A3] focus:border-[#9E7FFF] focus:ring-2 focus:ring-[#9E7FFF]/20 focus:outline-none transition-colors"
             }
           )
@@ -1387,16 +2661,16 @@ function RegisterRoute() {
             type: "submit",
             disabled: isSubmitting,
             className: "w-full rounded-lg bg-[#9E7FFF] py-2.5 px-4 text-white font-semibold hover:bg-[#8B6EE6] focus:outline-none focus:ring-2 focus:ring-[#9E7FFF]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all",
-            children: isSubmitting ? "Creando cuenta..." : "Crear cuenta"
+            children: isSubmitting ? "Creating account..." : "Create account"
           }
         )
       ] }) }),
       /* @__PURE__ */ jsxs("p", { className: "mt-6 text-center text-sm text-[#A3A3A3]", children: [
-        "¿Ya tienes una cuenta?",
+        "Already have an account?",
         " ",
-        /* @__PURE__ */ jsx(Link, { to: `/auth/login?redirectTo=${encodeURIComponent(redirectTo)}`, className: "font-semibold text-[#9E7FFF] hover:text-[#B39DFF] transition-colors", children: "Iniciar sesión" })
+        /* @__PURE__ */ jsx(Link, { to: `/auth/login?redirectTo=${encodeURIComponent(redirectTo)}`, className: "font-semibold text-[#9E7FFF] hover:text-[#B39DFF] transition-colors", children: "Log in" })
       ] }),
-      /* @__PURE__ */ jsx("p", { className: "mt-2 text-center text-sm text-[#A3A3A3]", children: /* @__PURE__ */ jsx(Link, { to: "/", className: "text-[#A3A3A3] hover:text-white transition-colors", children: "← Volver al inicio" }) })
+      /* @__PURE__ */ jsx("p", { className: "mt-2 text-center text-sm text-[#A3A3A3]", children: /* @__PURE__ */ jsx(Link, { to: "/", className: "text-[#A3A3A3] hover:text-white transition-colors", children: "← Back to home" }) })
     ] })
   ] });
 }
@@ -1465,20 +2739,20 @@ function AdminDashboard() {
   return /* @__PURE__ */ jsxs(AdminLayout, { adminEmail: data.adminEmail, children: [
     /* @__PURE__ */ jsxs("div", { className: "mb-8", children: [
       /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-white", children: "Dashboard" }),
-      /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3] mt-1", children: "Resumen general de la plataforma." })
+      /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3] mt-1", children: "Platform overview." })
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8", children: [
-      /* @__PURE__ */ jsx(StatCard, { label: "Usuarios", value: data.stats.totalUsers, icon: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0z", accent: "bg-blue-500/10 text-blue-400" }),
-      /* @__PURE__ */ jsx(StatCard, { label: "Proyectos", value: data.stats.totalProjects, icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z", accent: "bg-purple-500/10 text-purple-400" }),
-      /* @__PURE__ */ jsx(StatCard, { label: "Archivos", value: data.stats.totalFiles, icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z", accent: "bg-green-500/10 text-green-400" }),
-      /* @__PURE__ */ jsx(StatCard, { label: "Modelos activos", value: data.stats.activeModels, icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M3 13a2 2 0 00-2 2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2", accent: "bg-orange-500/10 text-orange-400" }),
-      /* @__PURE__ */ jsx(StatCard, { label: "Tokens emitidos", value: data.stats.totalTokensIssued.toLocaleString(), icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.657 0 3 .895 3 2s-1.343 2-3 2m0-8c1.657 0 3 .895 3 2s-1.343 2-3 2m-9 2h2m2 0h2", accent: "bg-cyan-500/10 text-cyan-400" }),
-      /* @__PURE__ */ jsx(StatCard, { label: "Conexiones GitHub", value: data.stats.githubConnections, icon: "M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12", accent: "bg-pink-500/10 text-pink-400" })
+      /* @__PURE__ */ jsx(StatCard, { label: "Users", value: data.stats.totalUsers, icon: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0z", accent: "bg-blue-500/10 text-blue-400" }),
+      /* @__PURE__ */ jsx(StatCard, { label: "Projects", value: data.stats.totalProjects, icon: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z", accent: "bg-purple-500/10 text-purple-400" }),
+      /* @__PURE__ */ jsx(StatCard, { label: "Files", value: data.stats.totalFiles, icon: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z", accent: "bg-green-500/10 text-green-400" }),
+      /* @__PURE__ */ jsx(StatCard, { label: "Active models", value: data.stats.activeModels, icon: "M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M3 13a2 2 0 00-2 2V5a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2", accent: "bg-orange-500/10 text-orange-400" }),
+      /* @__PURE__ */ jsx(StatCard, { label: "Tokens issued", value: data.stats.totalTokensIssued.toLocaleString(), icon: "M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.657 0 3 .895 3 2s-1.343 2-3 2m0-8c1.657 0 3 .895 3 2s-1.343 2-3 2m-9 2h2m2 0h2", accent: "bg-cyan-500/10 text-cyan-400" }),
+      /* @__PURE__ */ jsx(StatCard, { label: "GitHub connections", value: data.stats.githubConnections, icon: "M12 .297c-6.63 0-12 5.373-12 12 0 5.303 3.438 9.8 8.205 11.385.6.113.82-.258.82-.577 0-.285-.01-1.04-.015-2.04-3.338.724-4.042-1.61-4.042-1.61C4.422 18.07 3.633 17.7 3.633 17.7c-1.087-.744.084-.729.084-.729 1.205.084 1.838 1.236 1.838 1.236 1.07 1.835 2.809 1.305 3.495.998.108-.776.417-1.305.76-1.605-2.665-.3-5.466-1.332-5.466-5.93 0-1.31.465-2.38 1.235-3.22-.135-.303-.54-1.523.105-3.176 0 0 1.005-.322 3.3 1.23.96-.267 1.98-.399 3-.405 1.02.006 2.04.138 3 .405 2.28-1.552 3.285-1.23 3.285-1.23.645 1.653.24 2.873.12 3.176.765.84 1.23 1.91 1.23 3.22 0 4.61-2.805 5.625-5.475 5.92.42.36.81 1.096.81 2.22 0 1.606-.015 2.896-.015 3.286 0 .315.21.69.825.57C20.565 22.092 24 17.592 24 12.297c0-6.627-5.373-12-12-12", accent: "bg-pink-500/10 text-pink-400" })
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "rounded-2xl bg-[#262626] p-6 ring-1 ring-[#2F2F2F] mb-8", children: [
       /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between mb-4", children: [
-        /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold text-white", children: "Estado de configuración" }),
-        /* @__PURE__ */ jsx(Link, { to: "/admin/settings", className: "text-xs text-[#9E7FFF] hover:underline", children: "Configurar →" })
+        /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold text-white", children: "Configuration status" }),
+        /* @__PURE__ */ jsx(Link, { to: "/admin/settings", className: "text-xs text-[#9E7FFF] hover:underline", children: "Configure →" })
       ] }),
       /* @__PURE__ */ jsx("div", { className: "grid grid-cols-2 lg:grid-cols-4 gap-3", children: data.settingsStatus.byCategory.map((cat) => /* @__PURE__ */ jsxs("div", { className: "rounded-lg bg-[#1E1E1E] p-3", children: [
         /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between mb-1", children: [
@@ -1500,19 +2774,19 @@ function AdminDashboard() {
     ] }),
     /* @__PURE__ */ jsxs("div", { className: "rounded-2xl bg-[#262626] ring-1 ring-[#2F2F2F] overflow-hidden", children: [
       /* @__PURE__ */ jsxs("div", { className: "flex items-center justify-between px-5 py-4 border-b border-[#2F2F2F]", children: [
-        /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold text-white", children: "Usuarios recientes" }),
-        /* @__PURE__ */ jsx(Link, { to: "/admin/users", className: "text-xs text-[#9E7FFF] hover:underline", children: "Ver todos →" })
+        /* @__PURE__ */ jsx("h2", { className: "text-sm font-semibold text-white", children: "Recent users" }),
+        /* @__PURE__ */ jsx(Link, { to: "/admin/users", className: "text-xs text-[#9E7FFF] hover:underline", children: "View all →" })
       ] }),
-      data.recentUsers.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3] px-5 py-8 text-center", children: "No hay usuarios registrados." }) : /* @__PURE__ */ jsxs("table", { className: "w-full", children: [
+      data.recentUsers.length === 0 ? /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3] px-5 py-8 text-center", children: "No registered users." }) : /* @__PURE__ */ jsxs("table", { className: "w-full", children: [
         /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F]", children: [
           /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-5 py-2.5", children: "Email" }),
-          /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-5 py-2.5", children: "Registrado" }),
-          /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-2.5", children: "Rol" })
+          /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-5 py-2.5", children: "Registered" }),
+          /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-2.5", children: "Role" })
         ] }) }),
         /* @__PURE__ */ jsx("tbody", { children: data.recentUsers.map((user) => /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F] last:border-0", children: [
           /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-sm text-white", children: user.email }),
-          /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-xs text-[#A3A3A3]", children: new Date(user.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short", year: "numeric" }) }),
-          /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: user.is_admin ? /* @__PURE__ */ jsx("span", { className: "text-xs px-2 py-0.5 rounded-full bg-[#9E7FFF]/20 text-[#9E7FFF]", children: "Admin" }) : /* @__PURE__ */ jsx("span", { className: "text-xs px-2 py-0.5 rounded-full bg-[#3F3F3F] text-[#A3A3A3]", children: "Usuario" }) })
+          /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-xs text-[#A3A3A3]", children: new Date(user.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" }) }),
+          /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: user.is_admin ? /* @__PURE__ */ jsx("span", { className: "text-xs px-2 py-0.5 rounded-full bg-[#9E7FFF]/20 text-[#9E7FFF]", children: "Admin" }) : /* @__PURE__ */ jsx("span", { className: "text-xs px-2 py-0.5 rounded-full bg-[#3F3F3F] text-[#A3A3A3]", children: "User" }) })
         ] }, user.id)) })
       ] })
     ] })
@@ -1525,7 +2799,7 @@ const route9 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProper
   meta: meta$4
 }, Symbol.toStringTag, { value: "Module" }));
 const meta$3 = () => [
-  { title: `${APP_NAME} - Admin · Modelos de IA` }
+  { title: `${APP_NAME} - Admin · AI Models` }
 ];
 async function loader$4({ request }) {
   const result = await requireAdmin(request);
@@ -1554,7 +2828,7 @@ async function action$6({ request }) {
     const badge = String(formData.get("badge") || "");
     const sort_order = parseInt(String(formData.get("sort_order") || "0"), 10);
     if (!name || !model_id) {
-      return Response.json({ error: "Nombre y model_id son obligatorios" }, { status: 400, headers: result.headers });
+      return Response.json({ error: "Name and model_id are required" }, { status: 400, headers: result.headers });
     }
     const { error } = await serviceClient.from("ai_models").insert({
       name,
@@ -1578,7 +2852,7 @@ async function action$6({ request }) {
     const field = String(formData.get("field") || "");
     const value = String(formData.get("value") || "");
     if (!id || !field) {
-      return Response.json({ error: "Faltan parámetros" }, { status: 400, headers: result.headers });
+      return Response.json({ error: "Missing parameters" }, { status: 400, headers: result.headers });
     }
     let parsedValue = value;
     if (field === "is_active") parsedValue = value === "true";
@@ -1600,7 +2874,7 @@ async function action$6({ request }) {
     }
     return Response.json({ success: true }, { headers: result.headers });
   }
-  return Response.json({ error: "Acción no reconocida" }, { status: 400, headers: result.headers });
+  return Response.json({ error: "Unrecognized action" }, { status: 400, headers: result.headers });
 }
 function AdminModelsRoute() {
   const { adminEmail, models } = useLoaderData();
@@ -1610,22 +2884,22 @@ function AdminModelsRoute() {
   const [showForm, setShowForm] = useState(false);
   return /* @__PURE__ */ jsxs(AdminLayout, { adminEmail, children: [
     /* @__PURE__ */ jsxs("div", { className: "mb-8", children: [
-      /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-white", children: "Modelos de IA" }),
-      /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3] mt-1", children: "Configura los modelos disponibles, precios y márgenes de ganancia." })
+      /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-white", children: "AI Models" }),
+      /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3] mt-1", children: "Configure available models, prices, and profit margins." })
     ] }),
     (actionData == null ? void 0 : actionData.error) && /* @__PURE__ */ jsx("div", { className: "mb-4 rounded-lg bg-red-500/10 border border-red-500/30 p-3", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-red-400", children: actionData.error }) }),
-    (actionData == null ? void 0 : actionData.success) && /* @__PURE__ */ jsx("div", { className: "mb-4 rounded-lg bg-green-500/10 border border-green-500/30 p-3", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-green-400", children: "Operación completada." }) }),
+    (actionData == null ? void 0 : actionData.success) && /* @__PURE__ */ jsx("div", { className: "mb-4 rounded-lg bg-green-500/10 border border-green-500/30 p-3", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-green-400", children: "Operation completed." }) }),
     /* @__PURE__ */ jsx("div", { className: "bg-[#262626] rounded-2xl ring-1 ring-[#2F2F2F] overflow-hidden mb-6", children: /* @__PURE__ */ jsxs("table", { className: "w-full", children: [
       /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F]", children: [
-        /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-4 py-3", children: "Nombre" }),
+        /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-4 py-3", children: "Name" }),
         /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-4 py-3", children: "Model ID" }),
         /* @__PURE__ */ jsx("th", { className: "text-right text-xs font-medium text-[#A3A3A3] px-4 py-3", children: "Markup" }),
         /* @__PURE__ */ jsx("th", { className: "text-right text-xs font-medium text-[#A3A3A3] px-4 py-3", children: "Cost Mult." }),
-        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-4 py-3", children: "Activo" }),
-        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-4 py-3", children: "Orden" }),
+        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-4 py-3", children: "Active" }),
+        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-4 py-3", children: "Order" }),
         /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-4 py-3" })
       ] }) }),
-      /* @__PURE__ */ jsx("tbody", { children: models.length === 0 ? /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 7, className: "text-center text-sm text-[#A3A3A3] py-8", children: "No hay modelos configurados." }) }) : models.map((model) => /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F] last:border-0", children: [
+      /* @__PURE__ */ jsx("tbody", { children: models.length === 0 ? /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 7, className: "text-center text-sm text-[#A3A3A3] py-8", children: "No models configured." }) }) : models.map((model) => /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F] last:border-0", children: [
         /* @__PURE__ */ jsx("td", { className: "px-4 py-3", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
           /* @__PURE__ */ jsx("span", { className: "text-sm text-white font-medium", children: model.name }),
           model.badge && /* @__PURE__ */ jsx("span", { className: "text-xs px-2 py-0.5 rounded-full bg-[#9E7FFF]/20 text-[#9E7FFF]", children: model.badge })
@@ -1650,7 +2924,7 @@ function AdminModelsRoute() {
               type: "submit",
               disabled: isSubmitting,
               className: `text-xs px-2 py-1 rounded-full transition-colors ${model.is_active ? "bg-green-500/20 text-green-400 hover:bg-green-500/30" : "bg-[#3F3F3F] text-[#A3A3A3] hover:bg-[#4F4F4F]"}`,
-              children: model.is_active ? "Activo" : "Inactivo"
+              children: model.is_active ? "Active" : "Inactive"
             }
           )
         ] }) }),
@@ -1661,7 +2935,7 @@ function AdminModelsRoute() {
             method: "post",
             className: "inline",
             onSubmit: (e) => {
-              if (!confirm("¿Eliminar este modelo?")) e.preventDefault();
+              if (!confirm("Delete this model?")) e.preventDefault();
             },
             children: [
               /* @__PURE__ */ jsx("input", { type: "hidden", name: "intent", value: "delete" }),
@@ -1672,7 +2946,7 @@ function AdminModelsRoute() {
                   type: "submit",
                   disabled: isSubmitting,
                   className: "text-[#A3A3A3] hover:text-red-400 transition-colors p-1",
-                  "aria-label": "Eliminar",
+                  "aria-label": "Delete",
                   children: /* @__PURE__ */ jsx("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" }) })
                 }
               )
@@ -1682,12 +2956,12 @@ function AdminModelsRoute() {
       ] }, model.id)) })
     ] }) }),
     showForm ? /* @__PURE__ */ jsxs("div", { className: "bg-[#262626] rounded-2xl ring-1 ring-[#2F2F2F] p-6", children: [
-      /* @__PURE__ */ jsx("h2", { className: "text-lg font-semibold text-white mb-4", children: "Nuevo modelo" }),
+      /* @__PURE__ */ jsx("h2", { className: "text-lg font-semibold text-white mb-4", children: "New model" }),
       /* @__PURE__ */ jsxs(Form, { method: "post", className: "space-y-4", children: [
         /* @__PURE__ */ jsx("input", { type: "hidden", name: "intent", value: "create" }),
         /* @__PURE__ */ jsxs("div", { className: "grid grid-cols-1 sm:grid-cols-2 gap-4", children: [
           /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Nombre" }),
+            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Name" }),
             /* @__PURE__ */ jsx("input", { name: "name", required: true, placeholder: "Claude 3.5 Sonnet", className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" })
           ] }),
           /* @__PURE__ */ jsxs("div", { children: [
@@ -1699,38 +2973,38 @@ function AdminModelsRoute() {
             /* @__PURE__ */ jsx("input", { name: "provider", defaultValue: "openrouter", className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" })
           ] }),
           /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Badge (opcional)" }),
-            /* @__PURE__ */ jsx("input", { name: "badge", placeholder: "Premium / Económico", className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" })
+            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Badge (optional)" }),
+            /* @__PURE__ */ jsx("input", { name: "badge", placeholder: "Premium / Budget", className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" })
           ] }),
           /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Precio input / token (USD)" }),
+            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Input price / token (USD)" }),
             /* @__PURE__ */ jsx("input", { name: "input_price_per_token", type: "number", step: "0.00000001", defaultValue: "0", className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" })
           ] }),
           /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Precio output / token (USD)" }),
+            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Output price / token (USD)" }),
             /* @__PURE__ */ jsx("input", { name: "output_price_per_token", type: "number", step: "0.00000001", defaultValue: "0", className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" })
           ] }),
           /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Markup (1.5 = 50% ganancia)" }),
+            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Markup (1.5 = 50% profit)" }),
             /* @__PURE__ */ jsx("input", { name: "markup_multiplier", type: "number", step: "0.1", defaultValue: "1.0", className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" })
           ] }),
           /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Multiplicador de tokens (2.0 = cobra 2x tokens)" }),
+            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Token multiplier (2.0 = charges 2x tokens)" }),
             /* @__PURE__ */ jsx("input", { name: "token_cost_multiplier", type: "number", step: "0.1", defaultValue: "1.0", className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" })
           ] }),
           /* @__PURE__ */ jsxs("div", { children: [
-            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Orden" }),
+            /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1", children: "Order" }),
             /* @__PURE__ */ jsx("input", { name: "sort_order", type: "number", defaultValue: "0", className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-3 py-2 text-white text-sm focus:border-[#9E7FFF] focus:outline-none" })
           ] })
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3", children: [
-          /* @__PURE__ */ jsx("button", { type: "submit", disabled: isSubmitting, className: "bg-[#9E7FFF] text-white font-semibold rounded-lg px-4 py-2 text-sm hover:bg-[#8B6EE6] transition-colors disabled:opacity-50", children: isSubmitting ? "Guardando..." : "Crear modelo" }),
-          /* @__PURE__ */ jsx("button", { type: "button", onClick: () => setShowForm(false), className: "text-[#A3A3A3] hover:text-white text-sm transition-colors", children: "Cancelar" })
+          /* @__PURE__ */ jsx("button", { type: "submit", disabled: isSubmitting, className: "bg-[#9E7FFF] text-white font-semibold rounded-lg px-4 py-2 text-sm hover:bg-[#8B6EE6] transition-colors disabled:opacity-50", children: isSubmitting ? "Saving..." : "Create model" }),
+          /* @__PURE__ */ jsx("button", { type: "button", onClick: () => setShowForm(false), className: "text-[#A3A3A3] hover:text-white text-sm transition-colors", children: "Cancel" })
         ] })
       ] })
     ] }) : /* @__PURE__ */ jsxs("button", { onClick: () => setShowForm(true), className: "flex items-center gap-2 bg-[#9E7FFF]/10 border border-[#9E7FFF]/30 text-[#9E7FFF] rounded-lg px-4 py-2.5 text-sm font-medium hover:bg-[#9E7FFF]/20 transition-colors", children: [
       /* @__PURE__ */ jsx("svg", { className: "w-4 h-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 4v16m8-8H4" }) }),
-      "Agregar modelo"
+      "Add model"
     ] })
   ] });
 }
@@ -1742,9 +3016,9 @@ const route10 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.definePrope
   meta: meta$3
 }, Symbol.toStringTag, { value: "Module" }));
 const TOKEN_PACKAGES$1 = {
-  basic: { name: "Básico", tokens: 5e5, price: 10, settingKey: "stripe_price_basic" },
+  basic: { name: "Basic", tokens: 5e5, price: 10, settingKey: "stripe_price_basic" },
   pro: { name: "Pro", tokens: 2e6, price: 25, settingKey: "stripe_price_pro" },
-  enterprise: { name: "Empresarial", tokens: 1e7, price: 99, settingKey: "stripe_price_enterprise" }
+  enterprise: { name: "Enterprise", tokens: 1e7, price: 99, settingKey: "stripe_price_enterprise" }
 };
 async function action$5({ request }) {
   if (request.method !== "POST") {
@@ -1755,30 +3029,30 @@ async function action$5({ request }) {
     data: { user }
   } = await supabase2.auth.getUser();
   if (!user || !user.email) {
-    return Response.json({ error: "No autenticado" }, { status: 401, headers });
+    return Response.json({ error: "Not authenticated" }, { status: 401, headers });
   }
   let body;
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Cuerpo de la petición inválido" }, { status: 400, headers });
+    return Response.json({ error: "Invalid request body" }, { status: 400, headers });
   }
   const packageKey = body.package;
   if (!packageKey || !(packageKey in TOKEN_PACKAGES$1)) {
-    return Response.json({ error: "Paquete inválido" }, { status: 400, headers });
+    return Response.json({ error: "Invalid package" }, { status: 400, headers });
   }
   const pkg = TOKEN_PACKAGES$1[packageKey];
   const priceId = await getSetting(pkg.settingKey);
   if (!priceId) {
     return Response.json(
-      { error: "Este paquete no está configurado. Configúralo en el panel de administración." },
+      { error: "This package is not configured. Configure it in the admin panel." },
       { status: 503, headers }
     );
   }
   const stripeSecretKey = await getSetting("stripe_secret_key");
   if (!stripeSecretKey) {
     return Response.json(
-      { error: "Stripe no está configurado. Configúralo en el panel de administración." },
+      { error: "Stripe is not configured. Configure it in the admin panel." },
       { status: 503, headers }
     );
   }
@@ -1799,7 +3073,7 @@ async function action$5({ request }) {
     });
   } catch (err) {
     console.error("Stripe checkout session creation failed:", err);
-    return Response.json({ error: "No se pudo crear la sesión de pago." }, { status: 502, headers });
+    return Response.json({ error: "Could not create payment session." }, { status: 502, headers });
   }
   return Response.json({ url: session.url }, { headers });
 }
@@ -1808,7 +3082,7 @@ const route11 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.definePrope
   action: action$5
 }, Symbol.toStringTag, { value: "Module" }));
 const meta$2 = () => [
-  { title: `${APP_NAME} - Admin · Usuarios` }
+  { title: `${APP_NAME} - Admin · Users` }
 ];
 async function loader$3({ request }) {
   const result = await requireAdmin(request);
@@ -1842,7 +3116,7 @@ async function action$4({ request }) {
   const intent = String(formData.get("intent") || "");
   const userId = String(formData.get("userId") || "");
   if (!userId) {
-    return Response.json({ error: "Falta el usuario" }, { status: 400, headers: result.headers });
+    return Response.json({ error: "Missing user" }, { status: 400, headers: result.headers });
   }
   const serviceClient = createSupabaseServiceClient();
   if (intent === "toggle_admin") {
@@ -1857,11 +3131,11 @@ async function action$4({ request }) {
   if (intent === "add_tokens") {
     const amount = parseInt(String(formData.get("amount") || "0"), 10);
     if (!amount || amount <= 0) {
-      return Response.json({ error: "Cantidad inválida" }, { status: 400, headers: result.headers });
+      return Response.json({ error: "Invalid amount" }, { status: 400, headers: result.headers });
     }
     const { data: profile } = await serviceClient.from("profiles").select("token_balance").eq("id", userId).maybeSingle();
     if (!profile) {
-      return Response.json({ error: "Usuario no encontrado" }, { status: 404, headers: result.headers });
+      return Response.json({ error: "User not found" }, { status: 404, headers: result.headers });
     }
     const newBalance = (profile.token_balance || 0) + amount;
     const { error } = await serviceClient.from("profiles").update({ token_balance: newBalance }).eq("id", userId);
@@ -1873,7 +3147,7 @@ async function action$4({ request }) {
   if (intent === "set_tokens") {
     const amount = parseInt(String(formData.get("amount") || "0"), 10);
     if (amount < 0) {
-      return Response.json({ error: "Cantidad inválida" }, { status: 400, headers: result.headers });
+      return Response.json({ error: "Invalid amount" }, { status: 400, headers: result.headers });
     }
     const { error } = await serviceClient.from("profiles").update({ token_balance: amount }).eq("id", userId);
     if (error) {
@@ -1881,7 +3155,7 @@ async function action$4({ request }) {
     }
     return Response.json({ success: true }, { headers: result.headers });
   }
-  return Response.json({ error: "Acción no reconocida" }, { status: 400, headers: result.headers });
+  return Response.json({ error: "Unrecognized action" }, { status: 400, headers: result.headers });
 }
 function AdminUsers() {
   const data = useLoaderData();
@@ -1891,31 +3165,31 @@ function AdminUsers() {
   const [tokenModal, setTokenModal] = useState(null);
   return /* @__PURE__ */ jsxs(AdminLayout, { adminEmail: data.adminEmail, children: [
     /* @__PURE__ */ jsxs("div", { className: "mb-8", children: [
-      /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-white", children: "Usuarios" }),
+      /* @__PURE__ */ jsx("h1", { className: "text-2xl font-bold text-white", children: "Users" }),
       /* @__PURE__ */ jsxs("p", { className: "text-sm text-[#A3A3A3] mt-1", children: [
         data.users.length,
-        " usuarios registrados."
+        " registered users."
       ] })
     ] }),
     (actionData == null ? void 0 : actionData.error) && /* @__PURE__ */ jsx("div", { className: "mb-4 rounded-lg bg-red-500/10 border border-red-500/30 p-3", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-red-400", children: actionData.error }) }),
-    (actionData == null ? void 0 : actionData.success) && /* @__PURE__ */ jsx("div", { className: "mb-4 rounded-lg bg-green-500/10 border border-green-500/30 p-3", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-green-400", children: "Operación completada." }) }),
+    (actionData == null ? void 0 : actionData.success) && /* @__PURE__ */ jsx("div", { className: "mb-4 rounded-lg bg-green-500/10 border border-green-500/30 p-3", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-green-400", children: "Operation completed." }) }),
     /* @__PURE__ */ jsx("div", { className: "rounded-2xl bg-[#262626] ring-1 ring-[#2F2F2F] overflow-hidden", children: /* @__PURE__ */ jsxs("table", { className: "w-full", children: [
       /* @__PURE__ */ jsx("thead", { children: /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F]", children: [
-        /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Usuario" }),
+        /* @__PURE__ */ jsx("th", { className: "text-left text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "User" }),
         /* @__PURE__ */ jsx("th", { className: "text-right text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Tokens" }),
-        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Proyectos" }),
-        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Registrado" }),
-        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Rol" }),
-        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Acciones" })
+        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Projects" }),
+        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Registered" }),
+        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Role" }),
+        /* @__PURE__ */ jsx("th", { className: "text-center text-xs font-medium text-[#A3A3A3] px-5 py-3", children: "Actions" })
       ] }) }),
-      /* @__PURE__ */ jsx("tbody", { children: data.users.length === 0 ? /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 6, className: "text-center text-sm text-[#A3A3A3] py-8", children: "No hay usuarios." }) }) : data.users.map((user) => /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F] last:border-0", children: [
+      /* @__PURE__ */ jsx("tbody", { children: data.users.length === 0 ? /* @__PURE__ */ jsx("tr", { children: /* @__PURE__ */ jsx("td", { colSpan: 6, className: "text-center text-sm text-[#A3A3A3] py-8", children: "No users." }) }) : data.users.map((user) => /* @__PURE__ */ jsxs("tr", { className: "border-b border-[#2F2F2F] last:border-0", children: [
         /* @__PURE__ */ jsx("td", { className: "px-5 py-3", children: /* @__PURE__ */ jsxs("div", { children: [
           /* @__PURE__ */ jsx("p", { className: "text-sm text-white", children: user.email }),
           user.full_name && /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3]", children: user.full_name })
         ] }) }),
         /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-right", children: /* @__PURE__ */ jsx("span", { className: "text-sm text-white font-mono", children: user.token_balance.toLocaleString() }) }),
         /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: /* @__PURE__ */ jsx("span", { className: "text-sm text-[#A3A3A3]", children: user.projectCount }) }),
-        /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: /* @__PURE__ */ jsx("span", { className: "text-xs text-[#A3A3A3]", children: new Date(user.created_at).toLocaleDateString("es-ES", { day: "numeric", month: "short" }) }) }),
+        /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: /* @__PURE__ */ jsx("span", { className: "text-xs text-[#A3A3A3]", children: new Date(user.created_at).toLocaleDateString("en-US", { day: "numeric", month: "short" }) }) }),
         /* @__PURE__ */ jsx("td", { className: "px-5 py-3 text-center", children: /* @__PURE__ */ jsxs(Form, { method: "post", className: "inline", children: [
           /* @__PURE__ */ jsx("input", { type: "hidden", name: "intent", value: "toggle_admin" }),
           /* @__PURE__ */ jsx("input", { type: "hidden", name: "userId", value: user.id }),
@@ -1926,7 +3200,7 @@ function AdminUsers() {
               type: "submit",
               disabled: isSubmitting,
               className: `text-xs px-2 py-1 rounded-full transition-colors ${user.is_admin ? "bg-[#9E7FFF]/20 text-[#9E7FFF] hover:bg-[#9E7FFF]/30" : "bg-[#3F3F3F] text-[#A3A3A3] hover:bg-[#4F4F4F]"}`,
-              children: user.is_admin ? "Admin" : "Usuario"
+              children: user.is_admin ? "Admin" : "User"
             }
           )
         ] }) }),
@@ -1936,7 +3210,7 @@ function AdminUsers() {
             {
               onClick: () => setTokenModal({ userId: user.id, email: user.email, mode: "add" }),
               className: "text-xs px-2 py-1 rounded-lg bg-green-500/10 text-green-400 hover:bg-green-500/20 transition-colors",
-              title: "Añadir tokens",
+              title: "Add tokens",
               children: "+ Tokens"
             }
           ),
@@ -1945,7 +3219,7 @@ function AdminUsers() {
             {
               onClick: () => setTokenModal({ userId: user.id, email: user.email, mode: "set" }),
               className: "text-xs px-2 py-1 rounded-lg bg-blue-500/10 text-blue-400 hover:bg-blue-500/20 transition-colors",
-              title: "Establecer tokens",
+              title: "Set tokens",
               children: "Set"
             }
           )
@@ -1953,13 +3227,13 @@ function AdminUsers() {
       ] }, user.id)) })
     ] }) }),
     tokenModal && /* @__PURE__ */ jsx("div", { className: "fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm", onClick: () => setTokenModal(null), children: /* @__PURE__ */ jsxs("div", { className: "rounded-2xl bg-[#262626] ring-1 ring-[#2F2F2F] p-6 w-full max-w-md mx-4", onClick: (e) => e.stopPropagation(), children: [
-      /* @__PURE__ */ jsx("h3", { className: "text-lg font-semibold text-white mb-2", children: tokenModal.mode === "add" ? "Añadir tokens" : "Establecer tokens" }),
+      /* @__PURE__ */ jsx("h3", { className: "text-lg font-semibold text-white mb-2", children: tokenModal.mode === "add" ? "Add tokens" : "Set tokens" }),
       /* @__PURE__ */ jsx("p", { className: "text-sm text-[#A3A3A3] mb-4", children: tokenModal.email }),
       /* @__PURE__ */ jsxs(Form, { method: "post", className: "space-y-4", children: [
         /* @__PURE__ */ jsx("input", { type: "hidden", name: "intent", value: tokenModal.mode === "add" ? "add_tokens" : "set_tokens" }),
         /* @__PURE__ */ jsx("input", { type: "hidden", name: "userId", value: tokenModal.userId }),
         /* @__PURE__ */ jsxs("div", { children: [
-          /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1.5", children: tokenModal.mode === "add" ? "Cantidad a añadir" : "Nuevo balance total" }),
+          /* @__PURE__ */ jsx("label", { className: "block text-xs font-medium text-[#A3A3A3] mb-1.5", children: tokenModal.mode === "add" ? "Amount to add" : "New total balance" }),
           /* @__PURE__ */ jsx(
             "input",
             {
@@ -1980,7 +3254,7 @@ function AdminUsers() {
               type: "submit",
               disabled: isSubmitting,
               className: "bg-[#9E7FFF] text-white font-semibold rounded-lg px-4 py-2 text-sm hover:bg-[#8B6EE6] transition-colors disabled:opacity-50",
-              children: isSubmitting ? "Guardando..." : "Confirmar"
+              children: isSubmitting ? "Saving..." : "Confirm"
             }
           ),
           /* @__PURE__ */ jsx(
@@ -1989,7 +3263,7 @@ function AdminUsers() {
               type: "button",
               onClick: () => setTokenModal(null),
               className: "text-[#A3A3A3] hover:text-white text-sm transition-colors",
-              children: "Cancelar"
+              children: "Cancel"
             }
           )
         ] })
@@ -2115,8 +3389,8 @@ const route14 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.definePrope
 }, Symbol.toStringTag, { value: "Module" }));
 const meta$1 = () => {
   return [
-    { title: `Iniciar sesión | ${APP_NAME}` },
-    { name: "description", content: "Accede a tu cuenta de Coderion para continuar construyendo con IA." }
+    { title: `Log in | ${APP_NAME}` },
+    { name: "description", content: "Access your Coderion account to continue building with AI." }
   ];
 };
 async function loader$1({ request }) {
@@ -2187,14 +3461,14 @@ function LoginRoute() {
           /* @__PURE__ */ jsx("svg", { className: "w-8 h-8 text-[#9E7FFF]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M13 10V3L4 14h7v7l9-11h-7z" }) }),
           /* @__PURE__ */ jsx("span", { className: "text-2xl font-bold text-white tracking-tight", children: APP_NAME })
         ] }),
-        /* @__PURE__ */ jsx("h1", { className: "mt-6 text-3xl font-bold text-white tracking-tight", children: "Bienvenido de nuevo" }),
-        /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-[#A3A3A3]", children: "Inicia sesión para continuar construyendo" })
+        /* @__PURE__ */ jsx("h1", { className: "mt-6 text-3xl font-bold text-white tracking-tight", children: "Welcome back" }),
+        /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-[#A3A3A3]", children: "Log in to continue building" })
       ] }),
       /* @__PURE__ */ jsx("div", { className: "bg-[#262626] rounded-2xl p-8 shadow-xl ring-1 ring-[#2F2F2F]", children: /* @__PURE__ */ jsxs(Form, { method: "post", className: "space-y-5", children: [
         /* @__PURE__ */ jsx("input", { type: "hidden", name: "redirectTo", value: redirectTo }),
         error && /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-[#ef4444]/10 border border-[#ef4444]/30 p-3", role: "alert", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-[#ef4444]", children: error }) }),
         /* @__PURE__ */ jsxs("div", { children: [
-          /* @__PURE__ */ jsx("label", { htmlFor: "email", className: "block text-sm font-medium text-[#A3A3A3] mb-1.5", children: "Correo electrónico" }),
+          /* @__PURE__ */ jsx("label", { htmlFor: "email", className: "block text-sm font-medium text-[#A3A3A3] mb-1.5", children: "Email" }),
           /* @__PURE__ */ jsx(
             "input",
             {
@@ -2206,13 +3480,13 @@ function LoginRoute() {
               required: true,
               value: email,
               onChange: (e) => setEmail(e.target.value),
-              placeholder: "tu@ejemplo.com",
+              placeholder: "you@example.com",
               className: "w-full rounded-lg bg-[#171717] border border-[#2F2F2F] px-4 py-2.5 text-white placeholder-[#A3A3A3] focus:border-[#9E7FFF] focus:ring-2 focus:ring-[#9E7FFF]/20 focus:outline-none transition-colors"
             }
           )
         ] }),
         /* @__PURE__ */ jsxs("div", { children: [
-          /* @__PURE__ */ jsx("label", { htmlFor: "password", className: "block text-sm font-medium text-[#A3A3A3] mb-1.5", children: "Contraseña" }),
+          /* @__PURE__ */ jsx("label", { htmlFor: "password", className: "block text-sm font-medium text-[#A3A3A3] mb-1.5", children: "Password" }),
           /* @__PURE__ */ jsx(
             "input",
             {
@@ -2234,16 +3508,16 @@ function LoginRoute() {
             type: "submit",
             disabled: isSubmitting,
             className: "w-full rounded-lg bg-[#9E7FFF] py-2.5 px-4 text-white font-semibold hover:bg-[#8B6EE6] focus:outline-none focus:ring-2 focus:ring-[#9E7FFF]/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all",
-            children: isSubmitting ? "Iniciando sesión..." : "Iniciar sesión"
+            children: isSubmitting ? "Logging in..." : "Log in"
           }
         )
       ] }) }),
       /* @__PURE__ */ jsxs("p", { className: "mt-6 text-center text-sm text-[#A3A3A3]", children: [
-        "¿No tienes una cuenta?",
+        "Don't have an account?",
         " ",
-        /* @__PURE__ */ jsx(Link, { to: `/auth/register?redirectTo=${encodeURIComponent(redirectTo)}`, className: "font-semibold text-[#9E7FFF] hover:text-[#B39DFF] transition-colors", children: "Crear cuenta" })
+        /* @__PURE__ */ jsx(Link, { to: `/auth/register?redirectTo=${encodeURIComponent(redirectTo)}`, className: "font-semibold text-[#9E7FFF] hover:text-[#B39DFF] transition-colors", children: "Create account" })
       ] }),
-      /* @__PURE__ */ jsx("p", { className: "mt-2 text-center text-sm text-[#A3A3A3]", children: /* @__PURE__ */ jsx(Link, { to: "/", className: "text-[#A3A3A3] hover:text-white transition-colors", children: "← Volver al inicio" }) })
+      /* @__PURE__ */ jsx("p", { className: "mt-2 text-center text-sm text-[#A3A3A3]", children: /* @__PURE__ */ jsx(Link, { to: "/", className: "text-[#A3A3A3] hover:text-white transition-colors", children: "← Back to home" }) })
     ] })
   ] });
 }
@@ -2351,30 +3625,30 @@ function stripFileBlocks(response) {
     cleaned = cleaned.replace(blockRegex, "");
   }
   cleaned = cleaned.replace(/\n{3,}/g, "\n\n").trim();
-  return cleaned || "Proyecto generado correctamente.";
+  return cleaned || "Project generated successfully.";
 }
 const OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions";
 const DEFAULT_MODEL_ID = "deepseek/deepseek-v4-pro-0813";
-const SYSTEM_PROMPT = `Eres un generador de proyectos web. Cuando el usuario te pida crear o modificar un proyecto, respondes con archivos completos usando bloques de codigo con la ruta del archivo.
+const SYSTEM_PROMPT = `You are a web project generator. When the user asks you to create or modify a project, respond with complete files using code blocks with the file path.
 
-Formato obligatorio para cada archivo:
+Required format for each file:
 
 \`\`\`tsx filepath:src/App.tsx
 import React from 'react';
 
 export default function App() {
-  return <div>Hola Mundo</div>;
+  return <div>Hello World</div>;
 }
 \`\`\`
 
-Reglas:
-- Cada bloque de codigo debe empezar con el lenguaje seguido de "filepath:" y la ruta del archivo
-- Incluye TODOS los archivos necesarios para que el proyecto funcione
-- Usa rutas relativas desde la raiz del proyecto (ej: src/App.tsx, package.json, vite.config.ts)
-- No abrevies el codigo ni uses comentarios como "// resto del codigo"
-- Escribe cada archivo completo, listo para usar
-- Despues de los bloques de codigo, puedes incluir una breve explicacion del proyecto
-- Si el usuario pide modificar un archivo existente, envia el archivo completo con los cambios aplicados`;
+Rules:
+- Each code block must start with the language followed by "filepath:" and the file path
+- Include ALL files needed for the project to work
+- Use relative paths from the project root (e.g.: src/App.tsx, package.json, vite.config.ts)
+- Do not abbreviate code or use comments like "// rest of the code"
+- Write each file completely, ready to use
+- After the code blocks, you can include a brief explanation of the project
+- If the user asks to modify an existing file, send the complete file with the changes applied`;
 async function action({ request }) {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
@@ -2384,25 +3658,25 @@ async function action({ request }) {
     data: { user }
   } = await supabase2.auth.getUser();
   if (!user) {
-    return Response.json({ error: "No autenticado" }, { status: 401, headers });
+    return Response.json({ error: "Not authenticated" }, { status: 401, headers });
   }
   let body;
   try {
     body = await request.json();
   } catch {
-    return Response.json({ error: "Cuerpo de la peticion invalido" }, { status: 400, headers });
+    return Response.json({ error: "Invalid request body" }, { status: 400, headers });
   }
   const { projectId, messages, modelId } = body;
   if (!projectId || !messages || !Array.isArray(messages) || messages.length === 0) {
-    return Response.json({ error: "Faltan parametros requeridos" }, { status: 400, headers });
+    return Response.json({ error: "Missing required parameters" }, { status: 400, headers });
   }
   const { data: project, error: projectError } = await supabase2.from("projects").select("id, user_id").eq("id", projectId).eq("user_id", user.id).maybeSingle();
   if (projectError || !project) {
-    return Response.json({ error: "Proyecto no encontrado" }, { status: 404, headers });
+    return Response.json({ error: "Project not found" }, { status: 404, headers });
   }
   const { data: profile, error: profileError } = await supabase2.from("profiles").select("token_balance, preferred_model_id").eq("id", user.id).maybeSingle();
   if (profileError || !profile) {
-    return Response.json({ error: "Perfil no encontrado" }, { status: 404, headers });
+    return Response.json({ error: "Profile not found" }, { status: 404, headers });
   }
   const tokenBalance = profile.token_balance;
   const targetModelId = modelId || profile.preferred_model_id;
@@ -2425,7 +3699,7 @@ async function action({ request }) {
   const estimatedTotal = estimatedInputTokens + estimatedOutputTokens;
   if (estimatedTotal > tokenBalance) {
     return Response.json(
-      { error: "No tienes suficientes tokens para enviar este mensaje.", tokenBalance },
+      { error: "You do not have enough tokens to send this message.", tokenBalance },
       { status: 402, headers }
     );
   }
@@ -2433,7 +3707,7 @@ async function action({ request }) {
   const apiKey = await getSetting("openrouter_api_key");
   if (!apiKey) {
     return Response.json(
-      { error: "El servicio de IA no esta configurado. Configura la API key de OpenRouter en el panel de administración." },
+      { error: "AI service is not configured. Set the OpenRouter API key in the admin panel." },
       { status: 503, headers }
     );
   }
@@ -2475,20 +3749,20 @@ async function action({ request }) {
             })
           });
         } catch {
-          send({ type: "error", error: "Error al contactar el servicio de IA." });
+          send({ type: "error", error: "Error contacting AI service." });
           controller.close();
           return;
         }
         if (!openrouterResponse.ok) {
           const errText = await openrouterResponse.text().catch(() => "");
           console.error("OpenRouter error:", openrouterResponse.status, errText);
-          send({ type: "error", error: "El servicio de IA devolvio un error." });
+          send({ type: "error", error: "AI service returned an error." });
           controller.close();
           return;
         }
         const reader = (_a = openrouterResponse.body) == null ? void 0 : _a.getReader();
         if (!reader) {
-          send({ type: "error", error: "No se pudo leer el stream." });
+          send({ type: "error", error: "Could not read stream." });
           controller.close();
           return;
         }
@@ -2516,7 +3790,7 @@ async function action({ request }) {
             }
           }
         }
-        const assistantContent = fullContent || "No se pudo generar una respuesta.";
+        const assistantContent = fullContent || "Could not generate a response.";
         const parsedFiles = parseGeneratedFiles(assistantContent);
         const displayContent = parsedFiles.length > 0 ? stripFileBlocks(assistantContent) : assistantContent;
         const actualTotalTokens = Math.ceil(
@@ -2529,7 +3803,7 @@ async function action({ request }) {
         );
         if (deductError) {
           console.error("Token deduction failed:", deductError);
-          send({ type: "error", error: "Error al descontar tokens." });
+          send({ type: "error", error: "Error deducting tokens." });
           controller.close();
           return;
         }
@@ -2581,7 +3855,7 @@ async function action({ request }) {
         });
       } catch (err) {
         console.error("Stream error:", err);
-        send({ type: "error", error: "Error inesperado en el servidor." });
+        send({ type: "error", error: "Unexpected server error." });
       } finally {
         controller.close();
       }
@@ -2599,30 +3873,11 @@ const route16 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.definePrope
   __proto__: null,
   action
 }, Symbol.toStringTag, { value: "Module" }));
-const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
-    detectSessionInUrl: true
-  }
-});
-async function createProject(userId) {
-  const { data, error } = await supabase.from("projects").insert({
-    user_id: userId,
-    title: "Nuevo proyecto",
-    messages: []
-  }).select().maybeSingle();
-  if (error) {
-    console.error("Error creating project:", error);
-    return null;
-  }
-  return data;
-}
 const meta = () => [
-  { title: `${APP_NAME} — Construye con IA` },
+  { title: `${APP_NAME} — Build with AI` },
   {
     name: "description",
-    content: "Crea aplicaciones web completas conversando con inteligencia artificial."
+    content: "Create complete web apps by chatting with AI."
   }
 ];
 async function loader({ request }) {
@@ -2681,25 +3936,25 @@ function PublicLanding() {
           /* @__PURE__ */ jsx("circle", { cx: "11", cy: "11", r: "7" }),
           /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "m20 20-4-4" })
         ] }),
-        "Buscar",
+        "Search",
         /* @__PURE__ */ jsx("span", { className: "ml-auto rounded border border-white/10 px-1 text-[9px]", children: "⌘ K" })
       ] }),
       /* @__PURE__ */ jsxs("nav", { className: "mt-5 space-y-1 text-xs", children: [
-        /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-white/10 px-3 py-2 font-medium text-white", children: "Inicio" }),
-        /* @__PURE__ */ jsx(Link, { to: "/auth/register", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Proyectos" }),
-        /* @__PURE__ */ jsx(Link, { to: "/auth/register", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Favoritos" }),
-        /* @__PURE__ */ jsx(Link, { to: "/auth/register", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Vistos recientemente" })
+        /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-white/10 px-3 py-2 font-medium text-white", children: "Home" }),
+        /* @__PURE__ */ jsx(Link, { to: "/auth/register", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Projects" }),
+        /* @__PURE__ */ jsx(Link, { to: "/auth/register", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Favorites" }),
+        /* @__PURE__ */ jsx(Link, { to: "/auth/register", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Recently viewed" })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "mt-7 border-t border-white/10 pt-5 text-xs", children: [
-        /* @__PURE__ */ jsx("p", { className: "px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-white/30", children: "Recursos" }),
-        /* @__PURE__ */ jsx("a", { href: "#como-funciona", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Centro de ayuda" }),
-        /* @__PURE__ */ jsx("a", { href: "#caracteristicas", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Novedades" }),
-        /* @__PURE__ */ jsx("a", { href: "#precios", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Estado" })
+        /* @__PURE__ */ jsx("p", { className: "px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-white/30", children: "Resources" }),
+        /* @__PURE__ */ jsx("a", { href: "#como-funciona", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Help center" }),
+        /* @__PURE__ */ jsx("a", { href: "#caracteristicas", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "What's new" }),
+        /* @__PURE__ */ jsx("a", { href: "#precios", className: "block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white", children: "Status" })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "absolute bottom-4 left-3 right-3 rounded-xl border border-white/10 bg-gradient-to-br from-[#15284e] to-[#10131c] p-3", children: [
-        /* @__PURE__ */ jsx("p", { className: "text-xs font-semibold text-white", children: "Empieza gratis" }),
-        /* @__PURE__ */ jsx("p", { className: "mt-1 text-[10px] leading-4 text-white/45", children: "Construye tu primera app con IA." }),
-        /* @__PURE__ */ jsx(Link, { to: "/auth/register", className: "mt-3 flex items-center justify-center rounded-lg bg-white py-2 text-[10px] font-semibold text-[#0757d9]", children: "Crear cuenta" })
+        /* @__PURE__ */ jsx("p", { className: "text-xs font-semibold text-white", children: "Start for free" }),
+        /* @__PURE__ */ jsx("p", { className: "mt-1 text-[10px] leading-4 text-white/45", children: "Build your first app with AI." }),
+        /* @__PURE__ */ jsx(Link, { to: "/auth/register", className: "mt-3 flex items-center justify-center rounded-lg bg-white py-2 text-[10px] font-semibold text-[#0757d9]", children: "Create account" })
       ] })
     ] }),
     /* @__PURE__ */ jsx("div", { className: "landing-grid pointer-events-none absolute inset-0 opacity-40" }),
@@ -2707,30 +3962,30 @@ function PublicLanding() {
     /* @__PURE__ */ jsx("div", { className: "landing-orb landing-orb-two pointer-events-none absolute -top-32 right-[7%] h-[27rem] w-[27rem] rounded-full bg-[#52d5ff]/20 blur-[100px]" }),
     /* @__PURE__ */ jsx("div", { className: "pointer-events-none absolute inset-x-0 top-0 h-[54rem] bg-[radial-gradient(ellipse_at_50%_18%,rgba(11,128,255,0.62),transparent_58%)]" }),
     /* @__PURE__ */ jsxs("header", { className: "relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:pl-56 lg:pr-10", children: [
-      /* @__PURE__ */ jsxs(Link, { to: "/", className: "flex items-center gap-2.5", "aria-label": `${APP_NAME} inicio`, children: [
+      /* @__PURE__ */ jsxs(Link, { to: "/", className: "flex items-center gap-2.5", "aria-label": `${APP_NAME} home`, children: [
         /* @__PURE__ */ jsx(BoltMark, {}),
         /* @__PURE__ */ jsx("span", { className: "text-lg font-bold tracking-tight", children: APP_NAME })
       ] }),
       /* @__PURE__ */ jsxs("nav", { className: "hidden items-center gap-8 text-sm text-white/70 md:flex", children: [
-        /* @__PURE__ */ jsx("a", { href: "#como-funciona", className: "transition-colors hover:text-white", children: "Cómo funciona" }),
-        /* @__PURE__ */ jsx("a", { href: "#caracteristicas", className: "transition-colors hover:text-white", children: "Características" }),
-        /* @__PURE__ */ jsx("a", { href: "#precios", className: "transition-colors hover:text-white", children: "Precios" })
+        /* @__PURE__ */ jsx("a", { href: "#como-funciona", className: "transition-colors hover:text-white", children: "How it works" }),
+        /* @__PURE__ */ jsx("a", { href: "#caracteristicas", className: "transition-colors hover:text-white", children: "Features" }),
+        /* @__PURE__ */ jsx("a", { href: "#precios", className: "transition-colors hover:text-white", children: "Pricing" })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-2", children: [
-        /* @__PURE__ */ jsx(Link, { to: "/auth/login", className: "rounded-lg px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white", children: "Iniciar sesión" }),
-        /* @__PURE__ */ jsx(Link, { to: "/auth/register", className: "hidden rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#0757d9] shadow-lg shadow-blue-950/20 transition-transform hover:-translate-y-0.5 sm:inline-flex", children: "Empezar gratis" })
+        /* @__PURE__ */ jsx(Link, { to: "/auth/login", className: "rounded-lg px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white", children: "Log in" }),
+        /* @__PURE__ */ jsx(Link, { to: "/auth/register", className: "hidden rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#0757d9] shadow-lg shadow-blue-950/20 transition-transform hover:-translate-y-0.5 sm:inline-flex", children: "Get started free" })
       ] })
     ] }),
     /* @__PURE__ */ jsx("main", { className: "relative z-10", children: /* @__PURE__ */ jsxs("section", { className: "mx-auto flex min-h-[calc(100vh-80px)] w-full max-w-5xl flex-col items-center px-5 pb-20 pt-24 text-center sm:px-8 sm:pt-32 lg:pl-56 lg:pt-36", children: [
       /* @__PURE__ */ jsxs("div", { className: "mb-7 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-3.5 py-1.5 text-xs font-medium text-white/80 backdrop-blur-md", children: [
         /* @__PURE__ */ jsx("span", { className: "h-1.5 w-1.5 animate-pulse rounded-full bg-[#67d8ff]" }),
-        "Tu nuevo compañero de desarrollo"
+        "Your new development companion"
       ] }),
       /* @__PURE__ */ jsxs("h1", { className: "max-w-4xl text-5xl font-semibold leading-[1.02] tracking-[-0.055em] text-white sm:text-6xl lg:text-8xl", children: [
-        "¿Qué vas a",
-        /* @__PURE__ */ jsx("span", { className: "block bg-gradient-to-r from-white via-[#b9eaff] to-[#54aaff] bg-clip-text text-transparent", children: "crear hoy?" })
+        "What are you going to",
+        /* @__PURE__ */ jsx("span", { className: "block bg-gradient-to-r from-white via-[#b9eaff] to-[#54aaff] bg-clip-text text-transparent", children: "create today?" })
       ] }),
-      /* @__PURE__ */ jsx("p", { className: "mt-6 max-w-xl text-base leading-7 text-white/65 sm:text-lg", children: "Crea aplicaciones y sitios web increíbles conversando con IA. Describe tu idea y mira cómo cobra vida." }),
+      /* @__PURE__ */ jsx("p", { className: "mt-6 max-w-xl text-base leading-7 text-white/65 sm:text-lg", children: "Create amazing apps and websites by chatting with AI. Describe your idea and watch it come to life." }),
       /* @__PURE__ */ jsxs(
         "form",
         {
@@ -2745,17 +4000,17 @@ function PublicLanding() {
                 value: prompt,
                 onChange: (event) => setPrompt(event.target.value),
                 rows: 2,
-                placeholder: "Cuéntame qué quieres construir...",
+                placeholder: "Tell me what you want to build...",
                 className: "w-full resize-none bg-transparent px-3 py-2 text-sm leading-6 text-white outline-none placeholder:text-white/35"
               }
             ),
             /* @__PURE__ */ jsxs("div", { className: "mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-2 pt-3", children: [
               /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-1.5", children: [
-                /* @__PURE__ */ jsx("button", { type: "button", className: "flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/60 transition-colors hover:bg-white/10 hover:text-white", "aria-label": "Añadir contexto", children: /* @__PURE__ */ jsx("svg", { className: "h-4 w-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 5v14m-7-7h14" }) }) }),
-                /* @__PURE__ */ jsx("span", { className: "hidden text-xs text-white/40 sm:block", children: "Empieza describiendo una idea" })
+                /* @__PURE__ */ jsx("button", { type: "button", className: "flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/60 transition-colors hover:bg-white/10 hover:text-white", "aria-label": "Add context", children: /* @__PURE__ */ jsx("svg", { className: "h-4 w-4", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M12 5v14m-7-7h14" }) }) }),
+                /* @__PURE__ */ jsx("span", { className: "hidden text-xs text-white/40 sm:block", children: "Start by describing an idea" })
               ] }),
               /* @__PURE__ */ jsxs("button", { type: "submit", className: "group flex items-center gap-2 rounded-lg bg-[#1687ff] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/40 transition-all hover:-translate-y-0.5 hover:bg-[#3298ff]", children: [
-                "Construir ahora",
+                "Build now",
                 /* @__PURE__ */ jsx(ArrowIcon, {})
               ] })
             ] })
@@ -2776,20 +4031,20 @@ function PublicLanding() {
         starter.label
       )) }),
       /* @__PURE__ */ jsxs("div", { className: "mt-12 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-xs text-white/45", children: [
-        /* @__PURE__ */ jsx("span", { children: "o empieza desde" }),
+        /* @__PURE__ */ jsx("span", { children: "or start from" }),
         /* @__PURE__ */ jsxs(Link, { to: "/auth/register", className: "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 transition-colors hover:bg-white/12 hover:text-white", children: [
           /* @__PURE__ */ jsx("span", { className: "font-semibold text-white/70", children: "GitHub" }),
           /* @__PURE__ */ jsx(ArrowIcon, {})
         ] }),
         /* @__PURE__ */ jsxs(Link, { to: "/auth/register", className: "inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 transition-colors hover:bg-white/12 hover:text-white", children: [
-          /* @__PURE__ */ jsx("span", { className: "font-semibold text-white/70", children: "Una plantilla" }),
+          /* @__PURE__ */ jsx("span", { className: "font-semibold text-white/70", children: "A template" }),
           /* @__PURE__ */ jsx(ArrowIcon, {})
         ] })
       ] }),
       /* @__PURE__ */ jsx("div", { className: "mt-24 grid w-full max-w-4xl grid-cols-1 gap-4 text-left sm:grid-cols-3", id: "caracteristicas", children: [
-        { title: "De idea a producto", body: "Describe lo que imaginas y recibe una aplicación lista para explorar.", icon: "✦" },
-        { title: "Edita con libertad", body: "Abre cada archivo, cambia el código y ve los resultados al instante.", icon: "⌁" },
-        { title: "Publica sin fricción", body: "Conecta GitHub, guarda tu trabajo y comparte tus proyectos.", icon: "↗" }
+        { title: "From idea to product", body: "Describe what you imagine and get an app ready to explore.", icon: "✦" },
+        { title: "Edit freely", body: "Open each file, change the code, and see results instantly.", icon: "⌁" },
+        { title: "Publish without friction", body: "Connect GitHub, save your work, and share your projects.", icon: "↗" }
       ].map((feature) => /* @__PURE__ */ jsxs("div", { className: "rounded-2xl border border-white/10 bg-white/[0.055] p-5 backdrop-blur-sm transition-colors hover:border-white/20 hover:bg-white/[0.09]", children: [
         /* @__PURE__ */ jsx("span", { className: "text-xl text-[#68cbff]", children: feature.icon }),
         /* @__PURE__ */ jsx("h2", { className: "mt-4 text-sm font-semibold text-white", children: feature.title }),
@@ -2801,7 +4056,7 @@ function PublicLanding() {
         "© 2026 ",
         APP_NAME
       ] }),
-      /* @__PURE__ */ jsx("span", { children: "Construye algo extraordinario." })
+      /* @__PURE__ */ jsx("span", { children: "Build something extraordinary." })
     ] })
   ] });
 }
@@ -2831,23 +4086,23 @@ function AuthenticatedHome({ data }) {
       /* @__PURE__ */ jsxs("div", { className: "mb-12 text-center", children: [
         /* @__PURE__ */ jsx("div", { className: "mb-6 inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-[#9E7FFF]/10 ring-1 ring-[#9E7FFF]/30", children: /* @__PURE__ */ jsx("svg", { className: "h-10 w-10 text-[#9E7FFF]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M13 10V3L4 14h7v7l9-11h-7z" }) }) }),
         /* @__PURE__ */ jsx("h1", { className: "mb-4 text-4xl font-bold tracking-tight text-white sm:text-5xl", children: "Coderion" }),
-        /* @__PURE__ */ jsx("p", { className: "mb-8 text-lg text-[#A3A3A3]", children: "Describe un proyecto web y la IA genera todos los archivos por ti." }),
+        /* @__PURE__ */ jsx("p", { className: "mb-8 text-lg text-[#A3A3A3]", children: "Describe a web project and the AI generates all the files for you." }),
         /* @__PURE__ */ jsxs("button", { onClick: () => handleNewProject(), disabled: isCreating, className: "inline-flex items-center gap-2 rounded-xl bg-[#9E7FFF] px-6 py-3 font-semibold text-white transition-all hover:bg-[#8B6EE6] disabled:opacity-50", children: [
-          isCreating ? "Creando..." : "Crear nuevo proyecto",
+          isCreating ? "Creating..." : "Create new project",
           !isCreating && /* @__PURE__ */ jsx(ArrowIcon, {})
         ] })
       ] }),
       /* @__PURE__ */ jsxs("div", { className: "mb-12 grid grid-cols-1 gap-4 sm:grid-cols-3", children: [
         /* @__PURE__ */ jsxs("div", { className: "rounded-2xl bg-[#262626] p-5 ring-1 ring-[#2F2F2F]", children: [
-          /* @__PURE__ */ jsx("h2", { className: "mb-1 text-sm font-medium text-[#A3A3A3]", children: "Tokens disponibles" }),
+          /* @__PURE__ */ jsx("h2", { className: "mb-1 text-sm font-medium text-[#A3A3A3]", children: "Available tokens" }),
           /* @__PURE__ */ jsx("p", { className: "text-2xl font-bold text-white", children: data.profile.token_balance.toLocaleString() })
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rounded-2xl bg-[#262626] p-5 ring-1 ring-[#2F2F2F]", children: [
-          /* @__PURE__ */ jsx("h2", { className: "mb-1 text-sm font-medium text-[#A3A3A3]", children: "Modelo" }),
+          /* @__PURE__ */ jsx("h2", { className: "mb-1 text-sm font-medium text-[#A3A3A3]", children: "Model" }),
           /* @__PURE__ */ jsx("p", { className: "text-2xl font-bold text-white", children: data.defaultModelName })
         ] }),
         /* @__PURE__ */ jsxs("div", { className: "rounded-2xl bg-[#262626] p-5 ring-1 ring-[#2F2F2F]", children: [
-          /* @__PURE__ */ jsx("h2", { className: "mb-1 text-sm font-medium text-[#A3A3A3]", children: "Versión" }),
+          /* @__PURE__ */ jsx("h2", { className: "mb-1 text-sm font-medium text-[#A3A3A3]", children: "Version" }),
           /* @__PURE__ */ jsxs("p", { className: "text-2xl font-bold text-white", children: [
             "v",
             APP_VERSION
@@ -2855,12 +4110,12 @@ function AuthenticatedHome({ data }) {
         ] })
       ] }),
       data.recentProjects.length > 0 && /* @__PURE__ */ jsxs("div", { children: [
-        /* @__PURE__ */ jsx("h3", { className: "mb-4 text-sm font-medium text-[#A3A3A3]", children: "Proyectos recientes" }),
+        /* @__PURE__ */ jsx("h3", { className: "mb-4 text-sm font-medium text-[#A3A3A3]", children: "Recent projects" }),
         /* @__PURE__ */ jsx("div", { className: "grid grid-cols-1 gap-3 sm:grid-cols-2", children: data.recentProjects.map((project) => /* @__PURE__ */ jsx("button", { onClick: () => navigate(`/project/${project.id}`), className: "group rounded-2xl bg-[#262626] p-4 text-left ring-1 ring-[#2F2F2F] transition-all hover:ring-[#9E7FFF]/30", children: /* @__PURE__ */ jsxs("div", { className: "flex items-center gap-3", children: [
           /* @__PURE__ */ jsx("div", { className: "flex h-10 w-10 items-center justify-center rounded-lg bg-[#9E7FFF]/10", children: /* @__PURE__ */ jsx("svg", { className: "h-5 w-5 text-[#9E7FFF]", fill: "none", viewBox: "0 0 24 24", stroke: "currentColor", strokeWidth: 2, children: /* @__PURE__ */ jsx("path", { strokeLinecap: "round", strokeLinejoin: "round", d: "M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" }) }) }),
           /* @__PURE__ */ jsxs("div", { className: "min-w-0 flex-1", children: [
             /* @__PURE__ */ jsx("p", { className: "truncate text-sm font-medium text-white transition-colors group-hover:text-[#9E7FFF]", children: project.title }),
-            /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3]", children: new Date(project.updated_at).toLocaleDateString("es-ES", { day: "numeric", month: "short" }) })
+            /* @__PURE__ */ jsx("p", { className: "text-xs text-[#A3A3A3]", children: new Date(project.updated_at).toLocaleDateString("en-US", { day: "numeric", month: "short" }) })
           ] })
         ] }) }, project.id)) })
       ] })
@@ -2877,7 +4132,7 @@ const route17 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.definePrope
   loader,
   meta
 }, Symbol.toStringTag, { value: "Module" }));
-const serverManifest = { "entry": { "module": "/assets/entry.client-CQJDeDiO.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/root-Brq5PtCq.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/api.github-connect": { "id": "routes/api.github-connect", "parentId": "root", "path": "api/github-connect", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-connect-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/project.$projectId": { "id": "routes/project.$projectId", "parentId": "root", "path": "project/:projectId", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/project._projectId-Ca-FXgYy.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/Menu.client-yZ0-NnL-.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/api.github-import": { "id": "routes/api.github-import", "parentId": "root", "path": "api/github-import", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-import-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/api.github-push": { "id": "routes/api.github-push", "parentId": "root", "path": "api/github-push", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-push-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/admin.projects": { "id": "routes/admin.projects", "parentId": "root", "path": "admin/projects", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.projects-DkNQsQbG.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/AdminLayout-BJfWQ44v.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/admin.settings": { "id": "routes/admin.settings", "parentId": "root", "path": "admin/settings", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.settings-JvZZ6THA.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/AdminLayout-BJfWQ44v.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/auth.callback": { "id": "routes/auth.callback", "parentId": "root", "path": "auth/callback", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.callback-DVYmPPln.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js"], "css": [] }, "routes/auth.register": { "id": "routes/auth.register", "parentId": "root", "path": "auth/register", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.register-BKznXjQW.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/admin._index": { "id": "routes/admin._index", "parentId": "root", "path": "admin", "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin._index-DiR-xFjU.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/AdminLayout-BJfWQ44v.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/admin.models": { "id": "routes/admin.models", "parentId": "root", "path": "admin/models", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.models-DEtf6x2d.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/AdminLayout-BJfWQ44v.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/api.checkout": { "id": "routes/api.checkout", "parentId": "root", "path": "api/checkout", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.checkout-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/admin.users": { "id": "routes/admin.users", "parentId": "root", "path": "admin/users", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.users-BZU-2-b1.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/AdminLayout-BJfWQ44v.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/api.webhook": { "id": "routes/api.webhook", "parentId": "root", "path": "api/webhook", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.webhook-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/auth.logout": { "id": "routes/auth.logout", "parentId": "root", "path": "auth/logout", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.logout-CSxRPO1x.js", "imports": [], "css": [] }, "routes/auth.login": { "id": "routes/auth.login", "parentId": "root", "path": "auth/login", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.login-Bn-mGRPG.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/api.chat": { "id": "routes/api.chat", "parentId": "root", "path": "api/chat", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.chat-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/_index": { "id": "routes/_index", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/_index-q4aIdlHv.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/Menu.client-yZ0-NnL-.js", "/assets/components-CWQyJQ-f.js"], "css": [] } }, "url": "/assets/manifest-f4f1f893.js", "version": "f4f1f893" };
+const serverManifest = { "entry": { "module": "/assets/entry.client-CQJDeDiO.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/root-Bl1bUkvi.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/api.github-connect": { "id": "routes/api.github-connect", "parentId": "root", "path": "api/github-connect", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-connect-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/project.$projectId": { "id": "routes/project.$projectId", "parentId": "root", "path": "project/:projectId", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/project._projectId-DgfMbnla.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/Menu-0g_87Xxr.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/api.github-import": { "id": "routes/api.github-import", "parentId": "root", "path": "api/github-import", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-import-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/api.github-push": { "id": "routes/api.github-push", "parentId": "root", "path": "api/github-push", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-push-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/admin.projects": { "id": "routes/admin.projects", "parentId": "root", "path": "admin/projects", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.projects-DY-Cqi5K.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/AdminLayout-uPzbQqoO.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/admin.settings": { "id": "routes/admin.settings", "parentId": "root", "path": "admin/settings", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.settings-DepPKY5X.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/AdminLayout-uPzbQqoO.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/auth.callback": { "id": "routes/auth.callback", "parentId": "root", "path": "auth/callback", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.callback-Den1N3aN.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js"], "css": [] }, "routes/auth.register": { "id": "routes/auth.register", "parentId": "root", "path": "auth/register", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.register-HUS6DRzH.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/admin._index": { "id": "routes/admin._index", "parentId": "root", "path": "admin", "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin._index-4ZAEq9_q.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/AdminLayout-uPzbQqoO.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/admin.models": { "id": "routes/admin.models", "parentId": "root", "path": "admin/models", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.models-Dn8NQL1M.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/AdminLayout-uPzbQqoO.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/api.checkout": { "id": "routes/api.checkout", "parentId": "root", "path": "api/checkout", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.checkout-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/admin.users": { "id": "routes/admin.users", "parentId": "root", "path": "admin/users", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.users-Y2fzX0Bd.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/AdminLayout-uPzbQqoO.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/api.webhook": { "id": "routes/api.webhook", "parentId": "root", "path": "api/webhook", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.webhook-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/auth.logout": { "id": "routes/auth.logout", "parentId": "root", "path": "auth/logout", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.logout-CSxRPO1x.js", "imports": [], "css": [] }, "routes/auth.login": { "id": "routes/auth.login", "parentId": "root", "path": "auth/login", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.login-BGoqfU30.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/components-CWQyJQ-f.js"], "css": [] }, "routes/api.chat": { "id": "routes/api.chat", "parentId": "root", "path": "api/chat", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.chat-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/_index": { "id": "routes/_index", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/_index-DlJobTG0.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-BG7SmB-l.js", "/assets/Menu-0g_87Xxr.js", "/assets/components-CWQyJQ-f.js"], "css": [] } }, "url": "/assets/manifest-7f3f99ae.js", "version": "7f3f99ae" };
 const mode = "production";
 const assetsBuildDirectory = "build/client";
 const basename = "/";
