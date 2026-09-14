@@ -75,7 +75,7 @@ export default function CodeEditor({ file, onContentChange }: CodeEditorProps) {
         <div className="flex items-center gap-2">
           <span className="text-xs font-mono text-[#A3A3A3]">{file.path}</span>
           {hasUnsavedChanges && (
-            <span className="w-2 h-2 rounded-full bg-[#9E7FFF]" title="Unsaved changes" />
+            <span className="w-2 h-2 rounded-full bg-[#6C9DE8]" title="Unsaved changes" />
           )}
         </div>
         <div className="flex items-center gap-2">

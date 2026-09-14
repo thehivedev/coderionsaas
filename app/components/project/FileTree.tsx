@@ -76,7 +76,7 @@ function getIcon(name: string, isFolder: boolean): string {
 function Icon({ type }: { type: string }) {
   const icons: Record<string, React.ReactElement> = {
     folder: (
-      <svg className="w-4 h-4 text-[#9E7FFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <svg className="w-4 h-4 text-[#6C9DE8]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
       </svg>
     ),
@@ -193,7 +193,7 @@ function TreeItem({
     <div
       className={`group flex items-center gap-1.5 px-2 py-1 cursor-pointer transition-colors ${
         isSelected
-          ? 'bg-[#9E7FFF]/10 text-white'
+          ? 'bg-[#4B82D1]/15 text-white'
           : 'text-[#A3A3A3] hover:bg-[#262626] hover:text-white'
       }`}
       style={{ paddingLeft }}

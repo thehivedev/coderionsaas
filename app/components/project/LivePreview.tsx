@@ -94,7 +94,7 @@ export default function LivePreview({ files }: LivePreviewProps) {
             onClick={() => setAutoRefresh(!autoRefresh)}
             className={`text-xs px-2 py-1 rounded transition-colors ${
               autoRefresh
-                ? 'text-[#9E7FFF] bg-[#9E7FFF]/10'
+                ? 'text-[#8FB9FF] bg-[#4B82D1]/10'
                 : 'text-[#A3A3A3] hover:text-white'
             }`}
           >
