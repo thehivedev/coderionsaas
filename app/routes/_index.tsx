@@ -226,27 +226,33 @@ function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
   }, []);
 
   return (
-    <div className="flex h-screen bg-[#171717]">
+    <div className="flex h-screen overflow-hidden">
       <MenuClient user={data.user} profile={data.profile} />
-      <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
-        <div className="mx-auto w-full max-w-4xl px-6 py-12">
-          <div className="mb-12 text-center">
-            <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-[#1688ee]/10 ring-1 ring-[#1688ee]/30"><BoltMark /></div>
-            <h1 className="mb-4 text-4xl font-bold tracking-tight text-white sm:text-5xl">{APP_NAME}</h1>
-            <p className="mb-8 text-lg text-[#A3A3A3]">Describe a web project and the AI generates all the files for you.</p>
-            <div className="flex items-center justify-center gap-3">
-              <button onClick={() => handleNewProject()} disabled={isCreating} className="inline-flex items-center gap-2 rounded-xl bg-[#1688ee] px-6 py-3 font-semibold text-white transition-all hover:bg-[#3298ff] disabled:opacity-50">{isCreating ? 'Creating...' : 'Create new project'}{!isCreating && <ArrowIcon />}</button>
-              <button onClick={() => handleNewProject(undefined, 'github')} disabled={isCreating} className="inline-flex items-center gap-2 rounded-xl bg-[#262626] px-5 py-3 text-sm font-medium text-white ring-1 ring-[#2F2F2F] transition-all hover:bg-[#2F2F2F] disabled:opacity-50"><GitHubIcon /> Start from GitHub</button>
+      <div className="public-landing relative min-w-0 flex-1 overflow-y-auto text-white">
+        <div className="public-landing__glow public-landing__glow--left" />
+        <div className="public-landing__glow public-landing__glow--right" />
+        <div className="public-landing__grid" />
+        <main className="relative z-10 flex min-h-screen flex-col items-center px-5 pt-[24vh] text-center sm:pt-[26vh]">
+          <h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em] text-white sm:text-[34px]">What will you build today?</h1>
+          <p className="mt-3 text-[12px] text-white/80 sm:text-[13px]">Create stunning apps &amp; websites by chatting with AI.</p>
+          <form onSubmit={(event) => { event.preventDefault(); handleNewProject(prompt); }} className={`mt-5 w-full max-w-[380px] rounded-[15px] border p-2.5 text-left shadow-[0_18px_55px_rgba(0,0,0,0.35)] transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] focus-within:border-white/20 focus-within:shadow-[0_18px_65px_rgba(0,100,255,0.2)] sm:max-w-[380px] ${planMode ? 'border-[#3b8ac0]/50 bg-[#1d2024]' : 'border-white/[0.08] bg-[#1b1b1d]'}`}>
+            <textarea name="prompt" rows={2} placeholder="Let's build a" className="h-[35px] w-full resize-none bg-transparent px-1.5 py-0.5 text-[11px] leading-5 text-white outline-none placeholder:text-white/35" />
+            <div className="mt-2 flex items-center justify-between">
+              <div className="flex min-w-0 items-center gap-1.5">
+                <button type="button" aria-label="Add context" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/10 hover:text-white"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}><path strokeLinecap="round" d="M12 5v14M5 12h14" /></svg></button>
+              </div>
+              <div className="flex items-center gap-2.5">
+                <button type="button" onClick={() => {}} className={`group flex items-center gap-1 rounded-full px-3 py-1.5 text-[10px] font-semibold transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${planMode ? 'bg-[#21415c] text-[#b8e4ff] shadow-[0_0_0_1px_rgba(88,180,239,0.22)]' : 'bg-[#1c3950] text-white/80 hover:bg-[#285879]'}`}><svg className="h-3 w-3 transition-transform duration-500 group-hover:rotate-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v3m0 12v3M3 12h3m12 0h3m-2.1-6.9-2.1 2.1m-9.6 9.6-2.1 2.1m0-13.8 2.1 2.1m9.6 9.6 2.1 2.1M15 9l1.1 3-1.1 3-3 1.1-3-1.1L7.9 12 9 9l3-1.1L15 9Z" /></svg>Plan</button>
+                <button type="submit" className={`group flex items-center gap-1.5 rounded-full bg-[#1688ee] px-3 py-1.5 text-[10px] font-semibold text-white transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[#36a0ff] ${planMode ? 'px-5 shadow-[0_0_24px_rgba(22,136,238,0.4)]' : 'shadow-[0_0_14px_rgba(22,136,238,0.2)]'}`}>{planMode ? 'Generate plan' : 'Build now'} <ArrowIcon /></button>
+              </div>
             </div>
+          </form>
+          <div className="mt-8 flex flex-wrap items-center justify-center gap-1.5 text-[10px] text-white/60">
+            <span className="mr-1">or start from</span>
+            <button type="button" onClick={() => handleNewProject(undefined, 'github')} disabled={isCreating} className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><GitHubIcon /> <span className="font-semibold">GitHub</span> <ArrowIcon /></button>
           </div>
-          <div className="mb-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <div className="rounded-2xl bg-[#262626] p-5 ring-1 ring-[#2F2F2F]"><h2 className="mb-1 text-sm font-medium text-[#A3A3A3]">Available tokens</h2><p className="text-2xl font-bold text-white">{data.profile.token_balance.toLocaleString()}</p></div>
-            <div className="rounded-2xl bg-[#262626] p-5 ring-1 ring-[#2F2F2F]"><h2 className="mb-1 text-sm font-medium text-[#A3A3A3]">Model</h2><p className="text-2xl font-bold text-white">{data.defaultModelName}</p></div>
-            <div className="rounded-2xl bg-[#262626] p-5 ring-1 ring-[#2F2F2F]"><h2 className="mb-1 text-sm font-medium text-[#A3A3A3]">Version</h2><p className="text-2xl font-bold text-white">v{APP_VERSION}</p></div>
-          </div>
-          {data.recentProjects.length > 0 && <div><h3 className="mb-4 text-sm font-medium text-[#A3A3A3]">Recent projects</h3><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{data.recentProjects.map((project) => <button key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="group rounded-2xl bg-[#262626] p-4 text-left ring-1 ring-[#2F2F2F] transition-all hover:ring-[#1688ee]/30"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1688ee]/10"><svg className="h-5 w-5 text-[#1688ee]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2Z" /></svg></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white transition-colors group-hover:text-[#1688ee]">{project.title}</p><p className="text-xs text-[#A3A3A3]">{new Date(project.updated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</p></div></div></button>)}</div></div>}
-        </div>
-      </main>
+        </main>
+      </div>
     </div>
   );
 }

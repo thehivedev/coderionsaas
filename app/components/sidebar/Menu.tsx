@@ -34,7 +34,6 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [showProjects, setShowProjects] = useState(false);
   const [showProfile, setShowProfile] = useState(false);
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
@@ -57,7 +56,6 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
   useEffect(() => {
     function closeMenus(event: globalThis.MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setShowProjects(false);
         setShowProfile(false);
       }
     }
@@ -105,7 +103,7 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
   const isHome = location.pathname === '/';
 
   const logo = (
-    <button type="button" onClick={() => goTo('/')} className="flex min-w-0 items-center gap-2 rounded-lg text-left text-[#F3F4F6] transition hover:text-white" aria-label="Go home">
+    <button type="button" onClick={() => { if (isCollapsed) setIsCollapsed(false); else goTo('/'); }} className="flex min-w-0 items-center gap-2 rounded-lg text-left text-[#F3F4F6] transition hover:text-white" aria-label={isCollapsed ? 'Expand menu' : 'Go home'}>
       <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white text-[11px] font-bold text-[#111217]">C</span>
       {!isCollapsed && <span className="truncate text-[14px] font-bold tracking-[-0.04em]">{APP_NAME}<sup className="ml-0.5 text-[7px] font-semibold tracking-normal">.new</sup></span>}
     </button>
@@ -126,25 +124,11 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
     </div>
   );
 
-  const projectMenu = showProjects && (
-    <div className={`absolute z-40 mt-2 w-72 overflow-hidden rounded-xl border border-[#30333A] bg-[#202226] p-1.5 shadow-2xl shadow-black/40 ${isHeader ? 'right-0 top-full' : 'left-2 top-20'}`}>
-      <div className="flex items-center justify-between px-2.5 py-1.5"><span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#858A94]">Projects</span><button type="button" onClick={handleNewProject} disabled={isCreating} className="text-[11px] font-medium text-[#78B7FF] hover:text-white">{isCreating ? 'Creating...' : 'New project'}</button></div>
-      <div className="max-h-72 overflow-y-auto">
-        {isLoading ? <p className="px-2.5 py-4 text-xs text-[#858A94]">Loading projects...</p> : filteredProjects.length === 0 ? <p className="px-2.5 py-4 text-xs text-[#858A94]">No projects found</p> : filteredProjects.map((project) => (
-          <div key={project.id} className="group flex items-center rounded-lg hover:bg-[#2C2F35]">
-            <button type="button" onClick={() => goTo(`/project/${project.id}`)} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-sm text-[#D4D6DB]"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#5FA9FF]" /><span className="truncate">{project.title}</span></button>
-            <button type="button" onClick={(event) => handleDeleteProject(project.id, event)} className="mr-1 rounded p-1.5 text-[#70757F] opacity-0 transition hover:text-red-300 group-hover:opacity-100" aria-label="Delete project"><span className="text-xs">×</span></button>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-
   if (isHeader) {
     return (
       <div ref={menuRef} className="relative flex h-12 shrink-0 items-center justify-between border-b border-[#2B2D32] bg-[#1A1B1E] px-3">
         <div className="flex items-center gap-3">{logo}<button type="button" onClick={() => setShowSearch(true)} className="hidden items-center gap-2 rounded-md border border-[#30333A] bg-[#202226] px-2.5 py-1.5 text-[11px] text-[#858A94] transition hover:border-[#4A505A] hover:text-white sm:flex"><MenuIcon name="search" className="h-3.5 w-3.5" /><span>Search</span><kbd className="rounded border border-[#3A3D44] px-1 text-[9px]">⌘K</kbd></button></div>
-        <div className="relative flex items-center gap-1"><button type="button" onClick={() => setShowProjects((current) => !current)} className="rounded-md p-2 text-[#858A94] transition hover:bg-[#282B31] hover:text-white" aria-label="Open projects"><MenuIcon name="projects" /></button><button type="button" onClick={() => setShowProfile((current) => !current)} className="rounded-md p-1 text-[#858A94] transition hover:bg-[#282B31] hover:text-white" aria-label="Open account"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#E47AC7] text-[10px] font-bold text-[#30152A]">{initials}</span></button>{projectMenu}{accountMenu}</div>
+        <div className="relative flex items-center gap-1"><button type="button" onClick={() => goTo('/projects')} className="rounded-md p-2 text-[#858A94] transition hover:bg-[#282B31] hover:text-white" aria-label="Open projects"><MenuIcon name="projects" /></button><button type="button" onClick={() => setShowProfile((current) => !current)} className="rounded-md p-1 text-[#858A94] transition hover:bg-[#282B31] hover:text-white" aria-label="Open account"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#E47AC7] text-[10px] font-bold text-[#30152A]">{initials}</span></button>{accountMenu}</div>
         {showSearch && <SearchModal query={query} setQuery={setQuery} projects={filteredProjects} onClose={() => { setShowSearch(false); setQuery(''); }} onSelect={(id) => { setShowSearch(false); setQuery(''); navigate(`/project/${id}`); }} />}
       </div>
     );
@@ -152,13 +136,12 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
 
   return (
     <aside ref={menuRef} className={`relative flex h-full shrink-0 flex-col border-r border-[#27292E] bg-[#111214] transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${isCollapsed ? 'w-[64px]' : 'w-[224px]'}`}>
-      <div className="flex h-14 items-center justify-between px-3">{logo}<button type="button" onClick={() => setIsCollapsed((current) => !current)} className="rounded-md p-1.5 text-[#777C86] transition hover:bg-[#24272C] hover:text-white" aria-label={isCollapsed ? 'Expand menu' : 'Collapse menu'}><MenuIcon name="collapse" className="h-4 w-4" /></button></div>
-      <div className="px-2 pb-3"><button type="button" onClick={() => setShowSearch(true)} className={`flex h-8 w-full items-center rounded-md text-[11px] text-[#858A94] transition hover:bg-[#24272C] hover:text-white ${isCollapsed ? 'justify-center' : 'gap-2 px-2'}`}><MenuIcon name="search" className="h-3.5 w-3.5" />{!isCollapsed && <><span className="flex-1 text-left">Search</span><kbd className="rounded border border-[#363940] px-1 text-[9px]">⌘K</kbd></>}</button></div>
+      <div className="flex h-14 items-center justify-between px-3">{logo}{!isCollapsed && <button type="button" onClick={() => setIsCollapsed(true)} className="rounded-md p-1.5 text-[#777C86] transition hover:bg-[#24272C] hover:text-white" aria-label="Collapse menu"><MenuIcon name="collapse" className="h-4 w-4" /></button>}</div>
+      {!isCollapsed && <div className="px-2 pb-3"><button type="button" onClick={() => setShowSearch(true)} className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-[11px] text-[#858A94] transition hover:bg-[#24272C] hover:text-white"><MenuIcon name="search" className="h-3.5 w-3.5" /><span className="flex-1 text-left">Search</span><kbd className="rounded border border-[#363940] px-1 text-[9px]">⌘K</kbd></button></div>}
       <nav className="space-y-1 px-2">
         <NavItem icon="home" label="Home" collapsed={isCollapsed} active={isHome} onClick={() => goTo('/')} />
-        <NavItem icon="projects" label="Projects" collapsed={isCollapsed} active={showProjects} onClick={() => setShowProjects((current) => !current)} />
+        <NavItem icon="projects" label="Projects" collapsed={isCollapsed} active={location.pathname.startsWith('/projects')} onClick={() => goTo('/projects')} />
       </nav>
-      {projectMenu}
       <div className="mx-2 my-4 border-t border-[#27292E]" />
       <nav className="space-y-1 px-2"><NavItem icon="help" label="Help center" collapsed={isCollapsed} onClick={() => window.open('https://support.bolt.new', '_blank', 'noopener,noreferrer')} /><NavItem icon="release" label="Release notes" collapsed={isCollapsed} onClick={() => window.open('https://support.bolt.new', '_blank', 'noopener,noreferrer')} /></nav>
       <div className="mt-auto relative border-t border-[#27292E] p-2"><button type="button" onClick={() => setShowProfile((current) => !current)} className={`flex w-full items-center rounded-lg p-2 text-left transition hover:bg-[#24272C] ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E47AC7] text-[11px] font-bold text-[#30152A]">{initials}</span>{!isCollapsed && <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-white">{profile.full_name || user.email}</span><span className="block truncate text-[10px] text-[#858A94]">{user.email}</span></span>}{!isCollapsed && <MenuIcon name="chevron" className="h-3.5 w-3.5 text-[#777C86]" />}</button>{accountMenu}</div>
