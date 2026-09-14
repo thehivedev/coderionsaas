@@ -1,0 +1,1 @@
+const I="https://thhfunhmylimhdhehipi.supabase.co",i="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoaGZ1bmhteWxpbWhkaGVoaXBpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzMzQzOTksImV4cCI6MjEwNDkxMDM5OX0.Fy3eE0yzhdp4APT4XQJ_nfpipeMP93hwO1A3wZ8xzCI",h="Coderion";export{h as A,i as S,I as a};
