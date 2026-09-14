@@ -34,7 +34,6 @@ export function createSupabaseServerClient(request: Request) {
           serialize(key, value, {
             path: '/',
             sameSite: 'lax',
-            httpOnly: true,
             maxAge: 60 * 60 * 24 * 7,
             ...options,
           })
@@ -45,7 +44,6 @@ export function createSupabaseServerClient(request: Request) {
           serialize(key, '', {
             path: '/',
             sameSite: 'lax',
-            httpOnly: true,
             maxAge: 0,
             ...options,
           })
