@@ -15,6 +15,7 @@ interface ProjectWorkspaceProps {
   initialFiles: ProjectFile[];
   models: AIModel[];
   initialPrompt?: string;
+  planMode?: boolean;
   user: { id: string; email: string };
   profile: Profile;
 }
@@ -33,7 +34,7 @@ function Icon({ name, className = 'h-4 w-4' }: { name: 'send' | 'code' | 'eye' |
   return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>{paths[name]}</svg>;
 }
 
-export default function ProjectWorkspace({ projectId, projectTitle, projectType, initialMessages, initialFiles, models, initialPrompt, user, profile }: ProjectWorkspaceProps) {
+export default function ProjectWorkspace({ projectId, projectTitle, projectType, initialMessages, initialFiles, models, initialPrompt, planMode, user, profile }: ProjectWorkspaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages || []);
   const [files, setFiles] = useState<ProjectFile[]>(initialFiles || []);
   const [input, setInput] = useState('');
@@ -42,6 +43,7 @@ export default function ProjectWorkspace({ projectId, projectTitle, projectType,
   const [streamingContent, setStreamingContent] = useState('');
   const [selectedModelId, setSelectedModelId] = useState(models[0]?.id || '');
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [isPlanMode, setIsPlanMode] = useState(planMode ?? false);
   const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null);
   const [showFilePanel, setShowFilePanel] = useState(false);
   const [editingFile, setEditingFile] = useState<ProjectFile | null>(null);
@@ -75,7 +77,7 @@ export default function ProjectWorkspace({ projectId, projectTitle, projectType,
     const optimisticMessages = [...messages, userMessage];
     setMessages(optimisticMessages);
     try {
-      const response = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, messages: optimisticMessages, modelId: selectedModelId || undefined }) });
+      const response = await fetch('/api/chat', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ projectId, messages: optimisticMessages, modelId: selectedModelId || undefined, planMode: isPlanMode }) });
       if (!response.ok) { const data = await response.json(); setError(data?.error || 'Error sending message.'); setMessages(messages); return; }
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
@@ -209,9 +211,9 @@ export default function ProjectWorkspace({ projectId, projectTitle, projectType,
               <div className="rounded-xl border border-[#3A3A3A] bg-[#242424] p-2.5 transition focus-within:border-[#5A7EAE] focus-within:ring-2 focus-within:ring-[#385A85]/20">
                 <textarea value={input} onChange={(event) => setInput(event.target.value)} onKeyDown={handleKeyDown} placeholder="Ask Coderion to build..." disabled={isSending} rows={3} className="w-full resize-none bg-transparent text-xs leading-5 text-white outline-none placeholder:text-[#777] disabled:opacity-50" />
                 <div className="mt-2 flex items-center justify-between">
-                  <span className="text-[10px] text-[#707070]">Enter to send</span>
-                  <button type="submit" disabled={!input.trim() || isSending} className="flex h-7 w-7 items-center justify-center rounded-lg bg-[#4B82D1] text-white transition hover:bg-[#5B91E0] disabled:cursor-not-allowed disabled:opacity-40" aria-label="Send message">
-                    <Icon name="send" className="h-3.5 w-3.5" />
+                  <button type="button" onClick={() => setIsPlanMode((v) => !v)} aria-pressed={isPlanMode} className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-semibold transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${isPlanMode ? 'bg-[#21415c] text-[#b8e4ff] shadow-[0_0_0_1px_rgba(88,180,239,0.22)]' : 'text-[#707070] hover:bg-[#2A2A2A] hover:text-[#aaa]'}`}><svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.6}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>Plan</button>
+                  <button type="submit" disabled={!input.trim() || isSending} className={`flex items-center gap-1.5 rounded-lg bg-[#4B82D1] py-1.5 text-[10px] font-semibold text-white transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] hover:bg-[#5B91E0] disabled:cursor-not-allowed disabled:opacity-40 ${isPlanMode ? 'px-4 shadow-[0_0_16px_rgba(75,130,209,0.4)]' : 'px-2.5'}`} aria-label={isPlanMode ? 'Generate plan' : 'Send message'}>
+                    {isPlanMode ? 'Generate plan' : <Icon name="send" className="h-3.5 w-3.5" />}
                   </button>
                 </div>
               </div>

@@ -64,6 +64,7 @@ export default function LoginRoute() {
   const redirectTo = searchParams.get('redirectTo') || '/';
   const initialPrompt = searchParams.get('prompt') || '';
   const projectType = searchParams.get('type') || '';
+  const planMode = searchParams.get('plan') === 'true';
   const emailRef = useRef<HTMLInputElement>(null);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -79,9 +80,10 @@ export default function LoginRoute() {
     if (actionData?.success) {
       const dest = actionData.redirectTo || redirectTo;
       const typeParam = projectType ? `&type=${encodeURIComponent(projectType)}` : '';
+      const planParam = planMode ? '&plan=true' : '';
       window.location.href = initialPrompt
-        ? `${dest}${dest.includes('?') ? '&' : '?'}prompt=${encodeURIComponent(initialPrompt)}${typeParam}`
-        : dest;
+        ? `${dest}${dest.includes('?') ? '&' : '?'}prompt=${encodeURIComponent(initialPrompt)}${typeParam}${planParam}`
+        : `${dest}${typeParam}${planParam}`;
     }
   }, [actionData, redirectTo, initialPrompt]);
 

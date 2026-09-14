@@ -78,6 +78,7 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
 export default function ProjectRoute() {
   const [searchParams] = useSearchParams();
   const initialPrompt = searchParams.get('prompt') || '';
+  const planMode = searchParams.get('plan') === 'true';
   const { user, profile, project, files, models } = useLoaderData<{
     user: { id: string; email: string };
     profile: {
@@ -111,6 +112,7 @@ export default function ProjectRoute() {
       initialFiles={files}
       models={models}
       initialPrompt={initialPrompt}
+      planMode={planMode}
       user={user}
       profile={profile}
     />

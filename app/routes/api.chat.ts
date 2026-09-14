@@ -137,9 +137,28 @@ Rules:
 - Write each file completely, ready to use
 - After the code blocks, you can include a brief explanation of the prototype`;
 
+const SYSTEM_PROMPT_PLAN = `You are a project planning assistant. The user has asked you to PLAN their project, NOT generate code yet.
+
+When responding to a plan request:
+- DO NOT write any code blocks or files
+- DO NOT use code blocks or the filepath format
+- Instead, provide a structured plan in plain text with these sections:
+
+1. **Overview** — A brief summary of what will be built
+2. **Tech Stack** — The technologies and libraries that will be used
+3. **File Structure** — The files that will be created and what each one does
+4. **Key Features** — The main features of the project
+5. **Implementation Steps** — A numbered list of the steps to build the project
+6. **Potential Challenges** — Any tricky parts and how they will be handled
+
+Keep the plan concise but thorough. Use markdown formatting (headings, bullet points, numbered lists) for readability.
+
+If the user asks you to actually build the project after seeing the plan, then switch to generating complete files as usual.`;
+
 const SYSTEM_PROMPT_DEFAULT = SYSTEM_PROMPT_WEB;
 
-function getSystemPrompt(projectType: string | null): string {
+function getSystemPrompt(projectType: string | null, planMode: boolean): string {
+  if (planMode) return SYSTEM_PROMPT_PLAN;
   switch (projectType) {
     case 'expo': return SYSTEM_PROMPT_EXPO;
     case 'slides': return SYSTEM_PROMPT_SLIDES;
@@ -164,7 +183,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return Response.json({ error: 'Not authenticated' }, { status: 401, headers });
   }
 
-  let body: { projectId?: string; messages?: ChatMessage[]; modelId?: string };
+  let body: { projectId?: string; messages?: ChatMessage[]; modelId?: string; planMode?: boolean };
   try {
     body = await request.json();
   } catch {
@@ -172,6 +191,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const { projectId, messages, modelId } = body;
+  const planMode = body.planMode === true;
 
   if (!projectId || !messages || !Array.isArray(messages) || messages.length === 0) {
     return Response.json({ error: 'Missing required parameters' }, { status: 400, headers });
@@ -190,7 +210,7 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const projectType = (project as { project_type?: string | null }).project_type ?? null;
-  const systemPrompt = getSystemPrompt(projectType);
+  const systemPrompt = getSystemPrompt(projectType, planMode);
 
   // Fetch current token balance and preferred model
   const { data: profile, error: profileError } = await supabase
