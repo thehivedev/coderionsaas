@@ -152,6 +152,12 @@ function Layout({ children }) {
 function App() {
   return /* @__PURE__ */ jsx(Outlet, {});
 }
+function HydrateFallback() {
+  return /* @__PURE__ */ jsx("div", { className: "min-h-screen bg-[#0e0e10] flex items-center justify-center", children: /* @__PURE__ */ jsx("div", { className: "text-center", children: /* @__PURE__ */ jsxs("svg", { className: "w-10 h-10 text-[#9E7FFF] animate-spin mx-auto", fill: "none", viewBox: "0 0 24 24", children: [
+    /* @__PURE__ */ jsx("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
+    /* @__PURE__ */ jsx("path", { className: "opacity-75", fill: "currentColor", d: "M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" })
+  ] }) }) });
+}
 function ErrorBoundary() {
   const error = useRouteError();
   const message = isRouteErrorResponse(error) ? `${error.status} ${error.statusText}: ${error.data}` : error instanceof Error ? error.message : String(error);
@@ -164,6 +170,7 @@ function ErrorBoundary() {
 const route0 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
   ErrorBoundary,
+  HydrateFallback,
   Layout,
   default: App,
   links
@@ -253,7 +260,7 @@ function getRedirectUrl(request) {
   const origin = url.origin;
   return `${origin}/api/github-connect`;
 }
-async function action$b({ request }) {
+async function action$8({ request }) {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
@@ -277,7 +284,7 @@ async function action$b({ request }) {
   const authUrl = `${GITHUB_OAUTH_AUTHORIZE}?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUrl)}&scope=${encodeURIComponent(scope)}&state=${state}`;
   return Response.json({ authUrl }, { headers });
 }
-async function loader$c({ request }) {
+async function loader$8({ request }) {
   const { supabase: supabase2, headers } = createSupabaseServerClient(request);
   const {
     data: { user }
@@ -383,8 +390,8 @@ async function loader$c({ request }) {
 }
 const route1 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$b,
-  loader: loader$c
+  action: action$8,
+  loader: loader$8
 }, Symbol.toStringTag, { value: "Module" }));
 const SUPABASE_URL = "https://thhfunhmylimhdhehipi.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRoaGZ1bmhteWxpbWhkaGVoaXBpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODkzMzQzOTksImV4cCI6MjEwNDkxMDM5OX0.Fy3eE0yzhdp4APT4XQJ_nfpipeMP93hwO1A3wZ8xzCI";
@@ -1959,33 +1966,21 @@ function ProjectWorkspace({ projectId, projectTitle, projectType, initialMessage
 const meta$9 = () => [
   { title: `${APP_NAME} - Project` }
 ];
-async function loader$b({ request, params }) {
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
-  const {
-    data: { user }
-  } = await supabase2.auth.getUser();
+async function loader$7({ params }) {
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return new Response(null, {
-      status: 302,
-      headers: { Location: "/auth/login", ...headers }
-    });
+    throw new Response(null, { status: 302, headers: { Location: "/auth/login" } });
   }
-  const { data: profile, error: profileError } = await supabase2.from("profiles").select("*").eq("id", user.id).maybeSingle();
+  const { data: profile, error: profileError } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
   if (profileError || !profile) {
-    return new Response(null, {
-      status: 302,
-      headers: { Location: "/auth/login", ...headers }
-    });
+    throw new Response(null, { status: 302, headers: { Location: "/auth/login" } });
   }
-  const { data: project, error: projectError } = await supabase2.from("projects").select("*").eq("id", params.projectId).eq("user_id", user.id).maybeSingle();
+  const { data: project, error: projectError } = await supabase.from("projects").select("*").eq("id", params.projectId).eq("user_id", user.id).maybeSingle();
   if (projectError || !project) {
-    return new Response(null, {
-      status: 302,
-      headers: { Location: "/", ...headers }
-    });
+    throw new Response(null, { status: 302, headers: { Location: "/" } });
   }
-  const { data: files } = await supabase2.from("project_files").select("*").eq("project_id", params.projectId).order("path", { ascending: true });
-  const { data: models } = await supabase2.from("ai_models").select("*").eq("is_active", true).order("sort_order", { ascending: true });
+  const { data: files } = await supabase.from("project_files").select("*").eq("project_id", params.projectId).order("path", { ascending: true });
+  const { data: models } = await supabase.from("ai_models").select("*").eq("is_active", true).order("sort_order", { ascending: true });
   return Response.json(
     {
       user: { id: user.id, email: user.email },
@@ -1993,8 +1988,7 @@ async function loader$b({ request, params }) {
       project,
       files: files || [],
       models: models || []
-    },
-    { headers }
+    }
   );
 }
 function ProjectRoute() {
@@ -2023,7 +2017,7 @@ function ProjectRoute() {
 const route2 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
   default: ProjectRoute,
-  loader: loader$b,
+  loader: loader$7,
   meta: meta$9
 }, Symbol.toStringTag, { value: "Module" }));
 const GITHUB_API$1 = "https://api.github.com";
@@ -2103,7 +2097,7 @@ async function getTreeBlobs(token, owner, repo, branch) {
   }
   return results;
 }
-async function action$a({ request }) {
+async function action$7({ request }) {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
@@ -2202,7 +2196,7 @@ async function action$a({ request }) {
 }
 const route3 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$a
+  action: action$7
 }, Symbol.toStringTag, { value: "Module" }));
 const GITHUB_API = "https://api.github.com";
 async function createBlob(token, owner, repo, content) {
@@ -2337,7 +2331,7 @@ async function createRepo(token, name, isPrivate) {
     defaultBranch: data.default_branch || "main"
   };
 }
-async function action$9({ request }) {
+async function action$6({ request }) {
   var _a;
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
@@ -2474,39 +2468,8 @@ ${files.length} files pushed.`
 }
 const route4 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$9
+  action: action$6
 }, Symbol.toStringTag, { value: "Module" }));
-async function requireAdmin(request) {
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
-  const {
-    data: { user }
-  } = await supabase2.auth.getUser();
-  if (!user) {
-    return {
-      redirect: new Response(null, {
-        status: 302,
-        headers: { Location: "/auth/login?redirectTo=/admin", ...headers }
-      })
-    };
-  }
-  const { data: profile } = await supabase2.from("profiles").select("id, email, is_admin").eq("id", user.id).maybeSingle();
-  if (!profile || !profile.is_admin) {
-    return {
-      redirect: new Response(null, {
-        status: 302,
-        headers: { Location: "/", ...headers }
-      })
-    };
-  }
-  return {
-    admin: {
-      userId: user.id,
-      email: profile.email || user.email || "",
-      isAdmin: true
-    },
-    headers
-  };
-}
 const NAV_ITEMS = [
   { path: "/admin", label: "Dashboard", icon: "M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" },
   { path: "/admin/settings", label: "API Keys", icon: "M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-4.07a1 1 0 01.49-.86l5.07-2.93A6 6 0 1121 9z" },
@@ -2565,18 +2528,19 @@ function AdminLayout({ children, adminEmail }) {
 const meta$8 = () => [
   { title: `${APP_NAME} - Admin · Projects` }
 ];
-async function loader$a({ request }) {
-  const result = await requireAdmin(request);
-  if ("redirect" in result) return result.redirect;
-  const serviceClient = createSupabaseServiceClient();
-  const { data: projects } = await serviceClient.from("projects").select("id, title, status, model_id, created_at, updated_at, user_id").order("updated_at", { ascending: false }).limit(100);
+async function loader$6() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: "/auth/login?redirectTo=/admin" } });
+  const { data: profile } = await supabase.from("profiles").select("id, email, is_admin").eq("id", user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: "/" } });
+  const { data: projects } = await supabase.from("projects").select("id, title, status, model_id, created_at, updated_at, user_id").order("updated_at", { ascending: false }).limit(100);
   const userIds = [...new Set((projects || []).map((p) => p.user_id))];
-  const { data: profiles } = await serviceClient.from("profiles").select("id, email").in("id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]);
+  const { data: profiles } = await supabase.from("profiles").select("id, email").in("id", userIds.length > 0 ? userIds : ["00000000-0000-0000-0000-000000000000"]);
   const emailMap = {};
   for (const p of profiles || []) {
     emailMap[p.id] = p.email;
   }
-  const { data: fileCounts } = await serviceClient.from("project_files").select("project_id");
+  const { data: fileCounts } = await supabase.from("project_files").select("project_id");
   const fileCountMap = {};
   for (const f of fileCounts || []) {
     const pid = f.project_id;
@@ -2593,7 +2557,7 @@ async function loader$a({ request }) {
     file_count: fileCountMap[p.id] || 0
   }));
   return Response.json({
-    adminEmail: result.admin.email,
+    adminEmail: profile.email,
     projects: adminProjects
   });
 }
@@ -2639,7 +2603,7 @@ function AdminProjects() {
 const route5 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
   default: AdminProjects,
-  loader: loader$a,
+  loader: loader$6,
   meta: meta$8
 }, Symbol.toStringTag, { value: "Module" }));
 const meta$7 = () => [
@@ -2652,33 +2616,35 @@ const CATEGORY_LABELS = {
   general: "General"
 };
 const CATEGORY_ORDER = ["ai", "stripe", "github", "general"];
-async function loader$9({ request }) {
-  const result = await requireAdmin(request);
-  if ("redirect" in result) return result.redirect;
-  const { supabase: supabase2 } = createSupabaseServerClient(request);
-  const { data: settings } = await supabase2.from("app_settings").select("key, value, category, label, is_secret").order("category", { ascending: true });
+async function loader$5() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: "/auth/login?redirectTo=/admin" } });
+  const { data: profile } = await supabase.from("profiles").select("id, email, is_admin").eq("id", user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: "/" } });
+  const { data: settings } = await supabase.from("app_settings").select("key, value, category, label, is_secret").order("category", { ascending: true });
   return Response.json({
-    adminEmail: result.admin.email,
+    adminEmail: profile.email,
     settings: settings || []
-  }, { headers: result.headers });
+  });
 }
-async function action$8({ request }) {
-  const result = await requireAdmin(request);
-  if ("redirect" in result) return result.redirect;
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
+async function action$5({ request }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: "/auth/login?redirectTo=/admin" } });
+  const { data: profile } = await supabase.from("profiles").select("id, email, is_admin").eq("id", user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: "/" } });
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
   if (intent === "update") {
     const key = String(formData.get("key") || "");
     const value = String(formData.get("value") || "");
     if (!key) {
-      return Response.json({ error: "Missing the key" }, { status: 400, headers });
+      return Response.json({ error: "Missing the key" }, { status: 400 });
     }
-    const { error } = await supabase2.from("app_settings").update({ value, updated_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("key", key);
+    const { error } = await supabase.from("app_settings").update({ value, updated_at: (/* @__PURE__ */ new Date()).toISOString() }).eq("key", key);
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
-    return Response.json({ success: true }, { headers });
+    return Response.json({ success: true });
   }
   if (intent === "add") {
     const key = String(formData.get("key") || "");
@@ -2687,23 +2653,23 @@ async function action$8({ request }) {
     const label = String(formData.get("label") || key);
     const is_secret = formData.get("is_secret") === "true";
     if (!key) {
-      return Response.json({ error: "Missing the key" }, { status: 400, headers });
+      return Response.json({ error: "Missing the key" }, { status: 400 });
     }
-    const { error } = await supabase2.from("app_settings").insert({ key, value, category, label, is_secret });
+    const { error } = await supabase.from("app_settings").insert({ key, value, category, label, is_secret });
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
-    return Response.json({ success: true }, { headers });
+    return Response.json({ success: true });
   }
   if (intent === "delete") {
     const key = String(formData.get("key") || "");
-    const { error } = await supabase2.from("app_settings").delete().eq("key", key);
+    const { error } = await supabase.from("app_settings").delete().eq("key", key);
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
-    return Response.json({ success: true }, { headers });
+    return Response.json({ success: true });
   }
-  return Response.json({ error: "Unrecognized action" }, { status: 400, headers });
+  return Response.json({ error: "Unrecognized action" }, { status: 400 });
 }
 function AdminSettings() {
   const data = useLoaderData();
@@ -2762,44 +2728,24 @@ function AdminSettings() {
 }
 const route6 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$8,
+  action: action$5,
   default: AdminSettings,
-  loader: loader$9,
+  loader: loader$5,
   meta: meta$7
 }, Symbol.toStringTag, { value: "Module" }));
-async function loader$8({ request }) {
-  const url = new URL(request.url);
-  const code = url.searchParams.get("code");
-  const next = url.searchParams.get("next") || "/";
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
-  if (!code) {
-    return new Response(
-      JSON.stringify({ error: "Authentication code not received." }),
-      {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...headers }
-      }
-    );
-  }
-  const { error } = await supabase2.auth.exchangeCodeForSession(code);
-  if (error) {
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 400,
-        headers: { "Content-Type": "application/json", ...headers }
-      }
-    );
-  }
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: next,
-      ...headers
-    }
-  });
-}
 function AuthCallback() {
+  const [searchParams] = useSearchParams();
+  const next = searchParams.get("next") || "/";
+  useEffect(() => {
+    const code = searchParams.get("code");
+    if (code) {
+      supabase.auth.exchangeCodeForSession(code).then(() => {
+        window.location.href = next;
+      });
+    } else {
+      window.location.href = next;
+    }
+  }, [next, searchParams]);
   return /* @__PURE__ */ jsx("div", { className: "min-h-screen bg-[#171717] flex items-center justify-center", children: /* @__PURE__ */ jsxs("div", { className: "text-center", children: [
     /* @__PURE__ */ jsxs("svg", { className: "w-12 h-12 text-[#9E7FFF] animate-spin mx-auto", fill: "none", viewBox: "0 0 24 24", children: [
       /* @__PURE__ */ jsx("circle", { className: "opacity-25", cx: "12", cy: "12", r: "10", stroke: "currentColor", strokeWidth: "4" }),
@@ -2810,8 +2756,7 @@ function AuthCallback() {
 }
 const route7 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  default: AuthCallback,
-  loader: loader$8
+  default: AuthCallback
 }, Symbol.toStringTag, { value: "Module" }));
 const meta$6 = () => {
   return [
@@ -2819,56 +2764,7 @@ const meta$6 = () => {
     { name: "description", content: "Create your Coderion account and start building with AI." }
   ];
 };
-async function loader$7({ request }) {
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
-  const {
-    data: { user }
-  } = await supabase2.auth.getUser();
-  if (user) {
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: "/",
-        ...headers
-      }
-    });
-  }
-  return new Response(null, { headers });
-}
-async function action$7({ request }) {
-  const formData = await request.formData();
-  const email = String(formData.get("email") || "");
-  const password = String(formData.get("password") || "");
-  const fullName = String(formData.get("fullName") || "");
-  const redirectTo = String(formData.get("redirectTo") || "/");
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
-  const { error } = await supabase2.auth.signUp({
-    email,
-    password,
-    options: {
-      data: {
-        full_name: fullName
-      }
-    }
-  });
-  if (error) {
-    return Response.json(
-      { error: error.message },
-      { status: 400, headers }
-    );
-  }
-  return Response.json(
-    {
-      success: true,
-      message: "Account created. You can now log in.",
-      redirectTo
-    },
-    { status: 200, headers }
-  );
-}
 function RegisterRoute() {
-  const actionData = useActionData();
-  const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/";
   const initialPrompt = searchParams.get("prompt") || "";
@@ -2880,22 +2776,35 @@ function RegisterRoute() {
   const [fullName, setFullName] = useState("");
   const [error, setError] = useState(null);
   const [message, setMessage] = useState(null);
-  const isSubmitting = navigation.state === "submitting";
+  const [isSubmitting, setIsSubmitting] = useState(false);
   useEffect(() => {
-    if (actionData == null ? void 0 : actionData.error) {
-      setError(actionData.error);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) window.location.href = redirectTo;
+    });
+  }, [redirectTo]);
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    setMessage(null);
+    setIsSubmitting(true);
+    const { error: signUpError } = await supabase.auth.signUp({
+      email,
+      password,
+      options: { data: { full_name: fullName } }
+    });
+    if (signUpError) {
+      setError(signUpError.message);
+      setIsSubmitting(false);
+      return;
     }
-    if (actionData == null ? void 0 : actionData.success) {
-      setMessage(actionData.message || "Account created successfully.");
-      const dest = actionData.redirectTo || redirectTo;
-      const typeParam = projectType ? `&type=${encodeURIComponent(projectType)}` : "";
-      const planParam = planMode ? "&plan=true" : "";
-      const loginUrl = initialPrompt ? `/auth/login?redirectTo=${encodeURIComponent(dest)}&prompt=${encodeURIComponent(initialPrompt)}${typeParam}${planParam}` : `/auth/login?redirectTo=${encodeURIComponent(dest)}${typeParam}${planParam}`;
-      setTimeout(() => {
-        window.location.href = loginUrl;
-      }, 2e3);
-    }
-  }, [actionData, redirectTo, initialPrompt]);
+    setMessage("Account created. You can now log in.");
+    const typeParam = projectType ? `&type=${encodeURIComponent(projectType)}` : "";
+    const planParam = planMode ? "&plan=true" : "";
+    const loginUrl = initialPrompt ? `/auth/login?redirectTo=${encodeURIComponent(redirectTo)}&prompt=${encodeURIComponent(initialPrompt)}${typeParam}${planParam}` : `/auth/login?redirectTo=${encodeURIComponent(redirectTo)}${typeParam}${planParam}`;
+    setTimeout(() => {
+      window.location.href = loginUrl;
+    }, 2e3);
+  }
   return /* @__PURE__ */ jsxs("div", { className: "min-h-screen bg-[#171717] flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden", children: [
     /* @__PURE__ */ jsxs("div", { className: "absolute inset-0 pointer-events-none", children: [
       /* @__PURE__ */ jsx("div", { className: "absolute top-0 left-1/4 w-96 h-96 bg-[#f472b6] opacity-10 rounded-full blur-3xl animate-pulse" }),
@@ -2914,7 +2823,7 @@ function RegisterRoute() {
           /* @__PURE__ */ jsx("p", { className: "text-sm text-white/80 line-clamp-3", children: initialPrompt })
         ] })
       ] }),
-      /* @__PURE__ */ jsx("div", { className: "bg-[#262626] rounded-2xl p-8 shadow-xl ring-1 ring-[#2F2F2F]", children: /* @__PURE__ */ jsxs(Form, { method: "post", className: "space-y-5", children: [
+      /* @__PURE__ */ jsx("div", { className: "bg-[#262626] rounded-2xl p-8 shadow-xl ring-1 ring-[#2F2F2F]", children: /* @__PURE__ */ jsxs("form", { onSubmit: handleSubmit, className: "space-y-5", children: [
         /* @__PURE__ */ jsx("input", { type: "hidden", name: "redirectTo", value: redirectTo }),
         error && /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-[#ef4444]/10 border border-[#ef4444]/30 p-3", role: "alert", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-[#ef4444]", children: error }) }),
         message && /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-[#10b981]/10 border border-[#10b981]/30 p-3", role: "alert", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-[#10b981]", children: message }) }),
@@ -2991,29 +2900,30 @@ function RegisterRoute() {
 }
 const route8 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$7,
   default: RegisterRoute,
-  loader: loader$7,
   meta: meta$6
 }, Symbol.toStringTag, { value: "Module" }));
 const meta$5 = () => [
   { title: `${APP_NAME} - Admin` }
 ];
-async function loader$6({ request }) {
-  const result = await requireAdmin(request);
-  if ("redirect" in result) return result.redirect;
-  const serviceClient = createSupabaseServiceClient();
+async function loader$4() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: "/auth/login?redirectTo=/admin" } });
+  const { data: profile } = await supabase.from("profiles").select("id, email, is_admin").eq("id", user.id).maybeSingle();
+  if (!profile || !profile.is_admin) {
+    throw new Response(null, { status: 302, headers: { Location: "/" } });
+  }
   const [{ count: totalUsers }, { count: totalProjects }, { count: totalFiles }, { count: activeModels }, { data: profiles }, { count: githubConnections }] = await Promise.all([
-    serviceClient.from("profiles").select("*", { count: "exact", head: true }),
-    serviceClient.from("projects").select("*", { count: "exact", head: true }),
-    serviceClient.from("project_files").select("*", { count: "exact", head: true }),
-    serviceClient.from("ai_models").select("*", { count: "exact", head: true }).eq("is_active", true),
-    serviceClient.from("profiles").select("id, email, created_at, is_admin").order("created_at", { ascending: false }).limit(5),
-    serviceClient.from("github_connections").select("*", { count: "exact", head: true })
+    supabase.from("profiles").select("*", { count: "exact", head: true }),
+    supabase.from("projects").select("*", { count: "exact", head: true }),
+    supabase.from("project_files").select("*", { count: "exact", head: true }),
+    supabase.from("ai_models").select("*", { count: "exact", head: true }).eq("is_active", true),
+    supabase.from("profiles").select("id, email, created_at, is_admin").order("created_at", { ascending: false }).limit(5),
+    supabase.from("github_connections").select("*", { count: "exact", head: true })
   ]);
-  const { data: tokenData } = await serviceClient.from("profiles").select("token_balance").not("token_balance", "is", null);
+  const { data: tokenData } = await supabase.from("profiles").select("token_balance").not("token_balance", "is", null);
   const totalTokensIssued = (tokenData || []).reduce((sum, p) => sum + (p.token_balance || 0), 0);
-  const { data: allSettings } = await serviceClient.from("app_settings").select("key, value, category").order("category", { ascending: true });
+  const { data: allSettings } = await supabase.from("app_settings").select("key, value, category").order("category", { ascending: true });
   const settings = allSettings || [];
   const configured = settings.filter((s) => s.value && s.value.trim() !== "").length;
   const total = settings.length;
@@ -3027,7 +2937,7 @@ async function loader$6({ request }) {
     };
   });
   return Response.json({
-    adminEmail: result.admin.email,
+    adminEmail: profile.email || user.email || "",
     stats: {
       totalUsers: totalUsers || 0,
       totalProjects: totalProjects || 0,
@@ -3110,28 +3020,29 @@ function AdminDashboard() {
 const route9 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
   default: AdminDashboard,
-  loader: loader$6,
+  loader: loader$4,
   meta: meta$5
 }, Symbol.toStringTag, { value: "Module" }));
 const meta$4 = () => [
   { title: `${APP_NAME} - Admin · AI Models` }
 ];
-async function loader$5({ request }) {
-  const result = await requireAdmin(request);
-  if ("redirect" in result) return result.redirect;
-  const { supabase: supabase2 } = createSupabaseServerClient(request);
-  const { data: models } = await supabase2.from("ai_models").select("*").order("sort_order", { ascending: true });
+async function loader$3() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: "/auth/login?redirectTo=/admin" } });
+  const { data: profile } = await supabase.from("profiles").select("id, email, is_admin").eq("id", user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: "/" } });
+  const { data: models } = await supabase.from("ai_models").select("*").order("sort_order", { ascending: true });
   return Response.json(
-    { adminEmail: result.admin.email, models: models || [] },
-    { headers: result.headers }
+    { adminEmail: profile.email, models: models || [] }
   );
 }
-async function action$6({ request }) {
-  const result = await requireAdmin(request);
-  if ("redirect" in result) return result.redirect;
+async function action$4({ request }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: "/auth/login?redirectTo=/admin" } });
+  const { data: profile } = await supabase.from("profiles").select("id, email, is_admin").eq("id", user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: "/" } });
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
-  const serviceClient = createSupabaseServiceClient();
   if (intent === "create") {
     const name = String(formData.get("name") || "");
     const model_id = String(formData.get("model_id") || "");
@@ -3143,9 +3054,9 @@ async function action$6({ request }) {
     const badge = String(formData.get("badge") || "");
     const sort_order = parseInt(String(formData.get("sort_order") || "0"), 10);
     if (!name || !model_id) {
-      return Response.json({ error: "Name and model_id are required" }, { status: 400, headers: result.headers });
+      return Response.json({ error: "Name and model_id are required" }, { status: 400 });
     }
-    const { error } = await serviceClient.from("ai_models").insert({
+    const { error } = await supabase.from("ai_models").insert({
       name,
       model_id,
       provider,
@@ -3158,16 +3069,16 @@ async function action$6({ request }) {
       is_active: true
     });
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
-    return Response.json({ success: true }, { headers: result.headers });
+    return Response.json({ success: true });
   }
   if (intent === "update") {
     const id = String(formData.get("id") || "");
     const field = String(formData.get("field") || "");
     const value = String(formData.get("value") || "");
     if (!id || !field) {
-      return Response.json({ error: "Missing parameters" }, { status: 400, headers: result.headers });
+      return Response.json({ error: "Missing parameters" }, { status: 400 });
     }
     let parsedValue = value;
     if (field === "is_active") parsedValue = value === "true";
@@ -3175,21 +3086,21 @@ async function action$6({ request }) {
     else if (["markup_multiplier", "token_cost_multiplier", "input_price_per_token", "output_price_per_token"].includes(field)) {
       parsedValue = parseFloat(value);
     }
-    const { error } = await serviceClient.from("ai_models").update({ [field]: parsedValue }).eq("id", id);
+    const { error } = await supabase.from("ai_models").update({ [field]: parsedValue }).eq("id", id);
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
-    return Response.json({ success: true }, { headers: result.headers });
+    return Response.json({ success: true });
   }
   if (intent === "delete") {
     const id = String(formData.get("id") || "");
-    const { error } = await serviceClient.from("ai_models").delete().eq("id", id);
+    const { error } = await supabase.from("ai_models").delete().eq("id", id);
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
-    return Response.json({ success: true }, { headers: result.headers });
+    return Response.json({ success: true });
   }
-  return Response.json({ error: "Unrecognized action" }, { status: 400, headers: result.headers });
+  return Response.json({ error: "Unrecognized action" }, { status: 400 });
 }
 function AdminModelsRoute() {
   const { adminEmail, models } = useLoaderData();
@@ -3325,9 +3236,9 @@ function AdminModelsRoute() {
 }
 const route10 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$6,
+  action: action$4,
   default: AdminModelsRoute,
-  loader: loader$5,
+  loader: loader$3,
   meta: meta$4
 }, Symbol.toStringTag, { value: "Module" }));
 const TOKEN_PACKAGES$1 = {
@@ -3335,7 +3246,7 @@ const TOKEN_PACKAGES$1 = {
   pro: { name: "Pro", tokens: 2e6, price: 25, settingKey: "stripe_price_pro" },
   enterprise: { name: "Enterprise", tokens: 1e7, price: 99, settingKey: "stripe_price_enterprise" }
 };
-async function action$5({ request }) {
+async function action$3({ request }) {
   if (request.method !== "POST") {
     return Response.json({ error: "Method not allowed" }, { status: 405 });
   }
@@ -3394,17 +3305,18 @@ async function action$5({ request }) {
 }
 const route11 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$5
+  action: action$3
 }, Symbol.toStringTag, { value: "Module" }));
 const meta$3 = () => [
   { title: `${APP_NAME} - Admin · Users` }
 ];
-async function loader$4({ request }) {
-  const result = await requireAdmin(request);
-  if ("redirect" in result) return result.redirect;
-  const serviceClient = createSupabaseServiceClient();
-  const { data: profiles } = await serviceClient.from("profiles").select("id, email, full_name, token_balance, is_admin, created_at").order("created_at", { ascending: false });
-  const { data: projectCounts } = await serviceClient.from("projects").select("user_id").order("user_id");
+async function loader$2() {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: "/auth/login?redirectTo=/admin" } });
+  const { data: profile } = await supabase.from("profiles").select("id, email, is_admin").eq("id", user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: "/" } });
+  const { data: profiles } = await supabase.from("profiles").select("id, email, full_name, token_balance, is_admin, created_at").order("created_at", { ascending: false });
+  const { data: projectCounts } = await supabase.from("projects").select("user_id").order("user_id");
   const countMap = {};
   for (const p of projectCounts || []) {
     const uid = p.user_id;
@@ -3420,57 +3332,58 @@ async function loader$4({ request }) {
     projectCount: countMap[p.id] || 0
   }));
   return Response.json({
-    adminEmail: result.admin.email,
+    adminEmail: profile.email,
     users
   });
 }
-async function action$4({ request }) {
-  const result = await requireAdmin(request);
-  if ("redirect" in result) return result.redirect;
+async function action$2({ request }) {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Response(null, { status: 302, headers: { Location: "/auth/login?redirectTo=/admin" } });
+  const { data: profile } = await supabase.from("profiles").select("id, email, is_admin").eq("id", user.id).maybeSingle();
+  if (!profile || !profile.is_admin) throw new Response(null, { status: 302, headers: { Location: "/" } });
   const formData = await request.formData();
   const intent = String(formData.get("intent") || "");
   const userId = String(formData.get("userId") || "");
   if (!userId) {
-    return Response.json({ error: "Missing user" }, { status: 400, headers: result.headers });
+    return Response.json({ error: "Missing user" }, { status: 400 });
   }
-  const serviceClient = createSupabaseServiceClient();
   if (intent === "toggle_admin") {
     const current = String(formData.get("current") || "false");
     const newAdmin = current !== "true";
-    const { error } = await serviceClient.from("profiles").update({ is_admin: newAdmin }).eq("id", userId);
+    const { error } = await supabase.from("profiles").update({ is_admin: newAdmin }).eq("id", userId);
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
-    return Response.json({ success: true }, { headers: result.headers });
+    return Response.json({ success: true });
   }
   if (intent === "add_tokens") {
     const amount = parseInt(String(formData.get("amount") || "0"), 10);
     if (!amount || amount <= 0) {
-      return Response.json({ error: "Invalid amount" }, { status: 400, headers: result.headers });
+      return Response.json({ error: "Invalid amount" }, { status: 400 });
     }
-    const { data: profile } = await serviceClient.from("profiles").select("token_balance").eq("id", userId).maybeSingle();
-    if (!profile) {
-      return Response.json({ error: "User not found" }, { status: 404, headers: result.headers });
+    const { data: profile2 } = await supabase.from("profiles").select("token_balance").eq("id", userId).maybeSingle();
+    if (!profile2) {
+      return Response.json({ error: "User not found" }, { status: 404 });
     }
-    const newBalance = (profile.token_balance || 0) + amount;
-    const { error } = await serviceClient.from("profiles").update({ token_balance: newBalance }).eq("id", userId);
+    const newBalance = (profile2.token_balance || 0) + amount;
+    const { error } = await supabase.from("profiles").update({ token_balance: newBalance }).eq("id", userId);
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
-    return Response.json({ success: true }, { headers: result.headers });
+    return Response.json({ success: true });
   }
   if (intent === "set_tokens") {
     const amount = parseInt(String(formData.get("amount") || "0"), 10);
     if (amount < 0) {
-      return Response.json({ error: "Invalid amount" }, { status: 400, headers: result.headers });
+      return Response.json({ error: "Invalid amount" }, { status: 400 });
     }
-    const { error } = await serviceClient.from("profiles").update({ token_balance: amount }).eq("id", userId);
+    const { error } = await supabase.from("profiles").update({ token_balance: amount }).eq("id", userId);
     if (error) {
-      return Response.json({ error: error.message }, { status: 500, headers: result.headers });
+      return Response.json({ error: error.message }, { status: 500 });
     }
-    return Response.json({ success: true }, { headers: result.headers });
+    return Response.json({ success: true });
   }
-  return Response.json({ error: "Unrecognized action" }, { status: 400, headers: result.headers });
+  return Response.json({ error: "Unrecognized action" }, { status: 400 });
 }
 function AdminUsers() {
   const data = useLoaderData();
@@ -3588,9 +3501,9 @@ function AdminUsers() {
 }
 const route12 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$4,
+  action: action$2,
   default: AdminUsers,
-  loader: loader$4,
+  loader: loader$2,
   meta: meta$3
 }, Symbol.toStringTag, { value: "Module" }));
 const TOKEN_PACKAGES = {
@@ -3598,7 +3511,7 @@ const TOKEN_PACKAGES = {
   pro: { tokens: 2e6, settingKey: "stripe_price_pro" },
   enterprise: { tokens: 1e7, settingKey: "stripe_price_enterprise" }
 };
-async function action$3({ request }) {
+async function action$1({ request }) {
   var _a, _b, _c;
   if (request.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -3672,35 +3585,19 @@ async function action$3({ request }) {
 }
 const route13 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$3
+  action: action$1
 }, Symbol.toStringTag, { value: "Module" }));
-async function action$2({ request }) {
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
-  await supabase2.auth.signOut();
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: "/auth/login",
-      ...headers
-    }
-  });
-}
-async function loader$3() {
-  return new Response(null, {
-    status: 302,
-    headers: {
-      Location: "/auth/login"
-    }
-  });
-}
 function LogoutRoute() {
-  return null;
+  useEffect(() => {
+    supabase.auth.signOut().then(() => {
+      window.location.href = "/auth/login";
+    });
+  }, []);
+  return /* @__PURE__ */ jsx("div", { className: "min-h-screen bg-[#171717] flex items-center justify-center", children: /* @__PURE__ */ jsx("p", { className: "text-[#A3A3A3]", children: "Signing out..." }) });
 }
 const route14 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$2,
-  default: LogoutRoute,
-  loader: loader$3
+  default: LogoutRoute
 }, Symbol.toStringTag, { value: "Module" }));
 const meta$2 = () => {
   return [
@@ -3708,46 +3605,7 @@ const meta$2 = () => {
     { name: "description", content: "Access your Coderion account to continue building with AI." }
   ];
 };
-async function loader$2({ request }) {
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
-  const {
-    data: { user }
-  } = await supabase2.auth.getUser();
-  if (user) {
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: "/",
-        ...headers
-      }
-    });
-  }
-  return new Response(null, { headers });
-}
-async function action$1({ request }) {
-  const formData = await request.formData();
-  const email = String(formData.get("email") || "");
-  const password = String(formData.get("password") || "");
-  const redirectTo = String(formData.get("redirectTo") || "/");
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
-  const { error } = await supabase2.auth.signInWithPassword({
-    email,
-    password
-  });
-  if (error) {
-    return Response.json(
-      { error: error.message },
-      { status: 400, headers }
-    );
-  }
-  return Response.json(
-    { success: true, redirectTo },
-    { status: 200, headers }
-  );
-}
 function LoginRoute() {
-  const actionData = useActionData();
-  const navigation = useNavigation();
   const [searchParams] = useSearchParams();
   const redirectTo = searchParams.get("redirectTo") || "/";
   const initialPrompt = searchParams.get("prompt") || "";
@@ -3757,18 +3615,27 @@ function LoginRoute() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState(null);
-  const isSubmitting = navigation.state === "submitting";
+  const [isSubmitting, setIsSubmitting] = useState(false);
   useEffect(() => {
-    if (actionData == null ? void 0 : actionData.error) {
-      setError(actionData.error);
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (user) window.location.href = redirectTo;
+    });
+  }, [redirectTo]);
+  async function handleSubmit(e) {
+    e.preventDefault();
+    setError(null);
+    setIsSubmitting(true);
+    const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+    if (signInError) {
+      setError(signInError.message);
+      setIsSubmitting(false);
+      return;
     }
-    if (actionData == null ? void 0 : actionData.success) {
-      const dest = actionData.redirectTo || redirectTo;
-      const typeParam = projectType ? `&type=${encodeURIComponent(projectType)}` : "";
-      const planParam = planMode ? "&plan=true" : "";
-      window.location.href = initialPrompt ? `${dest}${dest.includes("?") ? "&" : "?"}prompt=${encodeURIComponent(initialPrompt)}${typeParam}${planParam}` : `${dest}${typeParam}${planParam}`;
-    }
-  }, [actionData, redirectTo, initialPrompt]);
+    const dest = redirectTo;
+    const typeParam = projectType ? `&type=${encodeURIComponent(projectType)}` : "";
+    const planParam = planMode ? "&plan=true" : "";
+    window.location.href = initialPrompt ? `${dest}${dest.includes("?") ? "&" : "?"}prompt=${encodeURIComponent(initialPrompt)}${typeParam}${planParam}` : `${dest}${typeParam}${planParam}`;
+  }
   return /* @__PURE__ */ jsxs("div", { className: "min-h-screen bg-[#171717] flex flex-col justify-center px-4 py-12 sm:px-6 lg:px-8 relative overflow-hidden", children: [
     /* @__PURE__ */ jsxs("div", { className: "absolute inset-0 pointer-events-none", children: [
       /* @__PURE__ */ jsx("div", { className: "absolute top-0 left-1/4 w-96 h-96 bg-[#9E7FFF] opacity-10 rounded-full blur-3xl animate-pulse" }),
@@ -3783,7 +3650,7 @@ function LoginRoute() {
         /* @__PURE__ */ jsx("h1", { className: "mt-6 text-3xl font-bold text-white tracking-tight", children: "Welcome back" }),
         /* @__PURE__ */ jsx("p", { className: "mt-2 text-sm text-[#A3A3A3]", children: "Log in to continue building" })
       ] }),
-      /* @__PURE__ */ jsx("div", { className: "bg-[#262626] rounded-2xl p-8 shadow-xl ring-1 ring-[#2F2F2F]", children: /* @__PURE__ */ jsxs(Form, { method: "post", className: "space-y-5", children: [
+      /* @__PURE__ */ jsx("div", { className: "bg-[#262626] rounded-2xl p-8 shadow-xl ring-1 ring-[#2F2F2F]", children: /* @__PURE__ */ jsxs("form", { onSubmit: handleSubmit, className: "space-y-5", children: [
         /* @__PURE__ */ jsx("input", { type: "hidden", name: "redirectTo", value: redirectTo }),
         error && /* @__PURE__ */ jsx("div", { className: "rounded-lg bg-[#ef4444]/10 border border-[#ef4444]/30 p-3", role: "alert", children: /* @__PURE__ */ jsx("p", { className: "text-sm text-[#ef4444]", children: error }) }),
         /* @__PURE__ */ jsxs("div", { children: [
@@ -3842,9 +3709,7 @@ function LoginRoute() {
 }
 const route15 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.defineProperty({
   __proto__: null,
-  action: action$1,
   default: LoginRoute,
-  loader: loader$2,
   meta: meta$2
 }, Symbol.toStringTag, { value: "Module" }));
 const LANGUAGE_MAP = {
@@ -4336,24 +4201,22 @@ const route16 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.definePrope
 const meta$1 = () => [
   { title: `${APP_NAME} — Projects` }
 ];
-async function loader$1({ request }) {
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
-  const { data: { user } } = await supabase2.auth.getUser();
+async function loader$1() {
+  const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    return new Response(null, { status: 302, headers: { Location: "/auth/login", ...headers } });
+    throw new Response(null, { status: 302, headers: { Location: "/auth/login" } });
   }
-  const { data: profile } = await supabase2.from("profiles").select("*").eq("id", user.id).maybeSingle();
+  const { data: profile } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
   if (!profile) {
-    return new Response(null, { status: 302, headers: { Location: "/auth/login", ...headers } });
+    throw new Response(null, { status: 302, headers: { Location: "/auth/login" } });
   }
-  const { data: projects } = await supabase2.from("projects").select("*").eq("user_id", user.id).order("updated_at", { ascending: false });
+  const { data: projects } = await supabase.from("projects").select("*").eq("user_id", user.id).order("updated_at", { ascending: false });
   return Response.json(
     {
       user: { id: user.id, email: user.email || "" },
       profile,
       projects: projects || []
-    },
-    { headers }
+    }
   );
 }
 function ProjectIcon() {
@@ -4433,17 +4296,16 @@ const meta = () => [
   { title: `${APP_NAME} — Build with AI` },
   { name: "description", content: "Create complete web apps by chatting with AI." }
 ];
-async function loader({ request }) {
+async function loader() {
   var _a;
-  const { supabase: supabase2, headers } = createSupabaseServerClient(request);
-  const { data: { user } } = await supabase2.auth.getUser();
-  if (!user) return Response.json({ authenticated: false }, { headers });
-  const { data: profile, error: profileError } = await supabase2.from("profiles").select("*").eq("id", user.id).maybeSingle();
-  if (profileError || !profile) return Response.json({ authenticated: false }, { headers });
-  const { data: models } = await supabase2.from("ai_models").select("*").eq("is_active", true).order("sort_order", { ascending: true });
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return Response.json({ authenticated: false });
+  const { data: profile, error: profileError } = await supabase.from("profiles").select("*").eq("id", user.id).maybeSingle();
+  if (profileError || !profile) return Response.json({ authenticated: false });
+  const { data: models } = await supabase.from("ai_models").select("*").eq("is_active", true).order("sort_order", { ascending: true });
   const preferredModel = (models || []).find((model) => model.id === profile.preferred_model_id);
   const defaultModelName = (preferredModel == null ? void 0 : preferredModel.name) || ((_a = (models || [])[0]) == null ? void 0 : _a.name) || "DeepSeek V4";
-  const { data: projects } = await supabase2.from("projects").select("*").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(6);
+  const { data: projects } = await supabase.from("projects").select("*").eq("user_id", user.id).order("updated_at", { ascending: false }).limit(6);
   return Response.json(
     {
       authenticated: true,
@@ -4451,8 +4313,7 @@ async function loader({ request }) {
       profile,
       defaultModelName,
       recentProjects: projects || []
-    },
-    { headers }
+    }
   );
 }
 function BoltMark() {
@@ -4720,7 +4581,7 @@ const route18 = /* @__PURE__ */ Object.freeze(/* @__PURE__ */ Object.definePrope
   loader,
   meta
 }, Symbol.toStringTag, { value: "Module" }));
-const serverManifest = { "entry": { "module": "/assets/entry.client-plGWgkDl.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": true, "module": "/assets/root-DAG-C-5I.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes/api.github-connect": { "id": "routes/api.github-connect", "parentId": "root", "path": "api/github-connect", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-connect-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/project.$projectId": { "id": "routes/project.$projectId", "parentId": "root", "path": "project/:projectId", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/project._projectId-m0VKCDah.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/Menu-CZUq7Pe6.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes/api.github-import": { "id": "routes/api.github-import", "parentId": "root", "path": "api/github-import", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-import-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/api.github-push": { "id": "routes/api.github-push", "parentId": "root", "path": "api/github-push", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-push-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/admin.projects": { "id": "routes/admin.projects", "parentId": "root", "path": "admin/projects", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.projects--yeMM84R.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/AdminLayout-DMql_kYw.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes/admin.settings": { "id": "routes/admin.settings", "parentId": "root", "path": "admin/settings", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.settings-h5xEUtuc.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/AdminLayout-DMql_kYw.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes/auth.callback": { "id": "routes/auth.callback", "parentId": "root", "path": "auth/callback", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.callback-Den1N3aN.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js"], "css": [] }, "routes/auth.register": { "id": "routes/auth.register", "parentId": "root", "path": "auth/register", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.register-DMwHNv7O.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes/admin._index": { "id": "routes/admin._index", "parentId": "root", "path": "admin", "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin._index-ixRKRwGk.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/AdminLayout-DMql_kYw.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes/admin.models": { "id": "routes/admin.models", "parentId": "root", "path": "admin/models", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.models-RBtkOT-k.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/AdminLayout-DMql_kYw.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes/api.checkout": { "id": "routes/api.checkout", "parentId": "root", "path": "api/checkout", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.checkout-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/admin.users": { "id": "routes/admin.users", "parentId": "root", "path": "admin/users", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.users-BxwRjKR3.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/AdminLayout-DMql_kYw.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes/api.webhook": { "id": "routes/api.webhook", "parentId": "root", "path": "api/webhook", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.webhook-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/auth.logout": { "id": "routes/auth.logout", "parentId": "root", "path": "auth/logout", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.logout-CSxRPO1x.js", "imports": [], "css": [] }, "routes/auth.login": { "id": "routes/auth.login", "parentId": "root", "path": "auth/login", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.login-CmQxQFal.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes/api.chat": { "id": "routes/api.chat", "parentId": "root", "path": "api/chat", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.chat-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/projects": { "id": "routes/projects", "parentId": "root", "path": "projects", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/projects-BUZ7P8Nc.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/Menu-CZUq7Pe6.js", "/assets/components-eubqvS0L.js"], "css": [] }, "routes/_index": { "id": "routes/_index", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/_index-lxJRtarW.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/Menu-CZUq7Pe6.js", "/assets/components-eubqvS0L.js"], "css": [] } }, "url": "/assets/manifest-50942fff.js", "version": "50942fff" };
+const serverManifest = { "entry": { "module": "/assets/entry.client-BjEqVf9I.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/index-D4Wv2Sc2.js", "/assets/components-CJngwfo5.js"], "css": [] }, "routes": { "root": { "id": "root", "parentId": void 0, "path": "", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": true, "module": "/assets/root-C7cBrCe5.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/index-D4Wv2Sc2.js", "/assets/components-CJngwfo5.js"], "css": [] }, "routes/api.github-connect": { "id": "routes/api.github-connect", "parentId": "root", "path": "api/github-connect", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-connect-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/project.$projectId": { "id": "routes/project.$projectId", "parentId": "root", "path": "project/:projectId", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/project._projectId-B01atJki.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/Menu-Cm3DpInT.js", "/assets/supabaseClient-qtVVYq8T.js", "/assets/index-D4Wv2Sc2.js", "/assets/components-CJngwfo5.js"], "css": [] }, "routes/api.github-import": { "id": "routes/api.github-import", "parentId": "root", "path": "api/github-import", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-import-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/api.github-push": { "id": "routes/api.github-push", "parentId": "root", "path": "api/github-push", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.github-push-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/admin.projects": { "id": "routes/admin.projects", "parentId": "root", "path": "admin/projects", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.projects-DMpya8FS.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/AdminLayout-DSHcppIj.js", "/assets/components-CJngwfo5.js", "/assets/index-D4Wv2Sc2.js"], "css": [] }, "routes/admin.settings": { "id": "routes/admin.settings", "parentId": "root", "path": "admin/settings", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.settings-32GsHrU4.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/AdminLayout-DSHcppIj.js", "/assets/components-CJngwfo5.js", "/assets/index-D4Wv2Sc2.js"], "css": [] }, "routes/auth.callback": { "id": "routes/auth.callback", "parentId": "root", "path": "auth/callback", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.callback-vik_8nHd.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/supabaseClient-qtVVYq8T.js", "/assets/index-D4Wv2Sc2.js", "/assets/constants-C5ZLtL5V.js"], "css": [] }, "routes/auth.register": { "id": "routes/auth.register", "parentId": "root", "path": "auth/register", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.register-RCDoSB7H.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/supabaseClient-qtVVYq8T.js", "/assets/constants-C5ZLtL5V.js", "/assets/index-D4Wv2Sc2.js", "/assets/components-CJngwfo5.js"], "css": [] }, "routes/admin._index": { "id": "routes/admin._index", "parentId": "root", "path": "admin", "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin._index-CKZqgO9V.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/AdminLayout-DSHcppIj.js", "/assets/components-CJngwfo5.js", "/assets/index-D4Wv2Sc2.js"], "css": [] }, "routes/admin.models": { "id": "routes/admin.models", "parentId": "root", "path": "admin/models", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.models-BEPtA4kM.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/AdminLayout-DSHcppIj.js", "/assets/components-CJngwfo5.js", "/assets/index-D4Wv2Sc2.js"], "css": [] }, "routes/api.checkout": { "id": "routes/api.checkout", "parentId": "root", "path": "api/checkout", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.checkout-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/admin.users": { "id": "routes/admin.users", "parentId": "root", "path": "admin/users", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/admin.users-DCbx9K_b.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/AdminLayout-DSHcppIj.js", "/assets/components-CJngwfo5.js", "/assets/index-D4Wv2Sc2.js"], "css": [] }, "routes/api.webhook": { "id": "routes/api.webhook", "parentId": "root", "path": "api/webhook", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.webhook-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/auth.logout": { "id": "routes/auth.logout", "parentId": "root", "path": "auth/logout", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.logout-uEpbGlEt.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/supabaseClient-qtVVYq8T.js", "/assets/constants-C5ZLtL5V.js"], "css": [] }, "routes/auth.login": { "id": "routes/auth.login", "parentId": "root", "path": "auth/login", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/auth.login-CVNsXZLm.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/supabaseClient-qtVVYq8T.js", "/assets/constants-C5ZLtL5V.js", "/assets/index-D4Wv2Sc2.js", "/assets/components-CJngwfo5.js"], "css": [] }, "routes/api.chat": { "id": "routes/api.chat", "parentId": "root", "path": "api/chat", "index": void 0, "caseSensitive": void 0, "hasAction": true, "hasLoader": false, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/api.chat-l0sNRNKZ.js", "imports": [], "css": [] }, "routes/projects": { "id": "routes/projects", "parentId": "root", "path": "projects", "index": void 0, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/projects-Az7Z-TrN.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/Menu-Cm3DpInT.js", "/assets/components-CJngwfo5.js", "/assets/index-D4Wv2Sc2.js", "/assets/supabaseClient-qtVVYq8T.js"], "css": [] }, "routes/_index": { "id": "routes/_index", "parentId": "root", "path": void 0, "index": true, "caseSensitive": void 0, "hasAction": false, "hasLoader": true, "hasClientAction": false, "hasClientLoader": false, "hasErrorBoundary": false, "module": "/assets/_index-C8iOO6og.js", "imports": ["/assets/jsx-runtime-BNRJbmTP.js", "/assets/constants-C5ZLtL5V.js", "/assets/Menu-Cm3DpInT.js", "/assets/components-CJngwfo5.js", "/assets/index-D4Wv2Sc2.js", "/assets/supabaseClient-qtVVYq8T.js"], "css": [] } }, "url": "/assets/manifest-de86842f.js", "version": "de86842f" };
 const mode = "production";
 const assetsBuildDirectory = "build/client";
 const basename = "/";
