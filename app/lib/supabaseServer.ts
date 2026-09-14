@@ -14,7 +14,15 @@ export function createSupabaseServerClient(request: Request) {
   const cookieHeader = request.headers.get('Cookie') ?? '';
   const cookies = parse(cookieHeader);
 
-  const setCookieHeaders: string[] = [];
+  const headers: Record<string, string> = {};
+
+  function syncSetCookie(value: string) {
+    if (headers['Set-Cookie']) {
+      headers['Set-Cookie'] = headers['Set-Cookie'] + ', ' + value;
+    } else {
+      headers['Set-Cookie'] = value;
+    }
+  }
 
   const serverClient = createServerClient(supabaseUrl, supabaseAnonKey, {
     cookies: {
@@ -22,7 +30,7 @@ export function createSupabaseServerClient(request: Request) {
         return cookies[key];
       },
       set(key: string, value: string, options: { [k: string]: unknown }) {
-        setCookieHeaders.push(
+        syncSetCookie(
           serialize(key, value, {
             path: '/',
             sameSite: 'lax',
@@ -33,7 +41,7 @@ export function createSupabaseServerClient(request: Request) {
         );
       },
       remove(key: string, options: { [k: string]: unknown }) {
-        setCookieHeaders.push(
+        syncSetCookie(
           serialize(key, '', {
             path: '/',
             sameSite: 'lax',
@@ -45,13 +53,6 @@ export function createSupabaseServerClient(request: Request) {
       },
     },
   });
-
-  const headers: Record<string, string> = {};
-  if (setCookieHeaders.length === 1) {
-    headers['Set-Cookie'] = setCookieHeaders[0];
-  } else if (setCookieHeaders.length > 1) {
-    headers['Set-Cookie'] = setCookieHeaders.join(', ');
-  }
 
   return { supabase: serverClient, headers };
 }
