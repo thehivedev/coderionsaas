@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type MouseEvent } from 'react';
 import { Form, useLocation, useNavigate } from '@remix-run/react';
 import { getProjects, createProject, deleteProject } from '~/lib/database';
 import type { Project, Profile } from '~/lib/types';
@@ -7,16 +7,41 @@ import { APP_NAME } from '~/lib/constants';
 interface MenuClientProps {
   user: { id: string; email: string };
   profile: Profile;
+  variant?: 'sidebar' | 'header';
 }
 
-export default function MenuClient({ user, profile }: MenuClientProps) {
+type MenuIconName = 'home' | 'projects' | 'help' | 'release' | 'search' | 'collapse' | 'chevron' | 'settings' | 'subscription' | 'logout';
+
+function MenuIcon({ name, className = 'h-4 w-4' }: { name: MenuIconName; className?: string }) {
+  const paths: Record<MenuIconName, React.ReactNode> = {
+    home: <path strokeLinecap="round" strokeLinejoin="round" d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V10Zm6 11v-6h6v6" />,
+    projects: <><rect x="3" y="4" width="18" height="16" rx="2" /><path strokeLinecap="round" d="M8 8h8M8 12h5M8 16h3" /></>,
+    help: <><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M9.7 9a2.4 2.4 0 1 1 3.8 1.9c-.9.6-1.5 1-1.5 2.1M12 16.5h.01" /></>,
+    release: <><path strokeLinecap="round" strokeLinejoin="round" d="M5 19 19 5M7 7h.01M17 17h.01" /><circle cx="7" cy="7" r="2" /><circle cx="17" cy="17" r="2" /></>,
+    search: <><circle cx="10.8" cy="10.8" r="6.3" /><path strokeLinecap="round" d="m16 16 4.5 4.5" /></>,
+    collapse: <><path strokeLinecap="round" d="M9 5 2.5 12 9 19M15 5l6.5 7-6.5 7" /></>,
+    chevron: <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />,
+    settings: <><circle cx="12" cy="12" r="3" /><path strokeLinecap="round" strokeLinejoin="round" d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-1.8 1.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.1h-2.5V20a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1-1.8-1.8.1-.1A1.7 1.7 0 0 0 8 15a1.7 1.7 0 0 0-1.6-1H6v-2.5h.1A1.7 1.7 0 0 0 8 10a1.7 1.7 0 0 0-.3-1.9l-.1-.1 1.8-1.8.1.1a1.7 1.7 0 0 0 1.9.3 1.7 1.7 0 0 0 1-1.6v-.1h2.5V5a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1 1.8 1.8-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.1V13h-.1A1.7 1.7 0 0 0 19.4 15Z" /></>,
+    subscription: <><path strokeLinecap="round" strokeLinejoin="round" d="M4 8.5h16M6 5h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" /><path strokeLinecap="round" d="M7 15h4" /></>,
+    logout: <><path strokeLinecap="round" d="M10 5H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h4M14 8l4 4-4 4M9 12h9" /></>,
+  };
+
+  return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}>{paths[name]}</svg>;
+}
+
+export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuClientProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-  const [openMenu, setOpenMenu] = useState<'navigation' | 'project' | 'profile' | null>(null);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [showProjects, setShowProjects] = useState(false);
+  const [showProfile, setShowProfile] = useState(false);
+  const [showSearch, setShowSearch] = useState(false);
+  const [query, setQuery] = useState('');
   const navigate = useNavigate();
   const location = useLocation();
   const menuRef = useRef<HTMLDivElement>(null);
+  const isHeader = variant === 'header';
 
   useEffect(() => {
     let mounted = true;
@@ -30,13 +55,24 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
   }, [user.id]);
 
   useEffect(() => {
-    function closeOnOutsideClick(event: MouseEvent) {
+    function closeMenus(event: globalThis.MouseEvent) {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        setOpenMenu(null);
+        setShowProjects(false);
+        setShowProfile(false);
       }
     }
-    document.addEventListener('mousedown', closeOnOutsideClick);
-    return () => document.removeEventListener('mousedown', closeOnOutsideClick);
+    function handleShortcut(event: globalThis.KeyboardEvent) {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault();
+        setShowSearch(true);
+      }
+    }
+    document.addEventListener('mousedown', closeMenus);
+    document.addEventListener('keydown', handleShortcut);
+    return () => {
+      document.removeEventListener('mousedown', closeMenus);
+      document.removeEventListener('keydown', handleShortcut);
+    };
   }, []);
 
   async function handleNewProject() {
@@ -44,159 +80,97 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
     setIsCreating(true);
     const project = await createProject(user.id);
     if (project) {
-      setProjects((prev) => [project, ...prev]);
-      setOpenMenu(null);
+      setProjects((previous) => [project, ...previous]);
       navigate(`/project/${project.id}`);
     }
     setIsCreating(false);
   }
 
-  async function handleDeleteProject(projectId: string, event: React.MouseEvent) {
+  async function handleDeleteProject(projectId: string, event: MouseEvent<HTMLButtonElement>) {
     event.stopPropagation();
-    const success = await deleteProject(projectId);
-    if (success) {
-      setProjects((prev) => prev.filter((project) => project.id !== projectId));
+    if (await deleteProject(projectId)) {
+      setProjects((previous) => previous.filter((project) => project.id !== projectId));
       if (location.pathname === `/project/${projectId}`) navigate('/');
     }
   }
 
   function goTo(path: string) {
-    setOpenMenu(null);
+    setShowProjects(false);
+    setShowProfile(false);
     navigate(path);
   }
 
-  const currentProject = projects.find((project) => location.pathname === `/project/${project.id}`);
   const initials = (profile.full_name || user.email).charAt(0).toUpperCase();
+  const filteredProjects = projects.filter((project) => project.title.toLowerCase().includes(query.trim().toLowerCase()));
+  const isHome = location.pathname === '/';
 
-  return (
-    <div ref={menuRef} className="relative shrink-0">
-      {/* Logo + nav row */}
-      <div className="flex items-center justify-between px-3 pt-3 pb-2">
-        <div className="relative">
-          <button
-            onClick={() => setOpenMenu(openMenu === 'navigation' ? null : 'navigation')}
-            className="group flex items-center gap-2 rounded-lg px-1.5 py-1 text-[#D4D4D4] transition hover:bg-[#242424] hover:text-white"
-            aria-label="Open navigation"
-          >
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-gradient-to-br from-[#4F9CF9] to-[#2B63D9] text-xs font-bold text-white shadow-lg shadow-blue-500/20">C</span>
-            <span className="text-sm font-semibold tracking-tight">{APP_NAME}</span>
-            <svg className="h-3.5 w-3.5 text-[#737373] transition group-hover:text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-          {openMenu === 'navigation' && (
-            <>
-              <div className="fixed inset-0 z-10 bg-black/20" onClick={() => setOpenMenu(null)} />
-              <div className="absolute left-0 top-full mt-1.5 z-30 w-64 overflow-hidden rounded-xl border border-[#333] bg-[#202020] p-1.5 shadow-2xl shadow-black/50">
-                <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#737373]">Workspace</div>
-                <button onClick={() => goTo('/')} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[#D4D4D4] transition hover:bg-[#2B2B2B] hover:text-white">
-                  <svg className="h-4 w-4 text-[#8FB9FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M4 5.5A2.5 2.5 0 016.5 3h11A2.5 2.5 0 0120 5.5v13a2.5 2.5 0 01-2.5 2.5h-11A2.5 2.5 0 014 18.5v-13zM8 8h8M8 12h5" /></svg>
-                  All projects
-                </button>
-                <button onClick={handleNewProject} disabled={isCreating} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm text-[#D4D4D4] transition hover:bg-[#2B2B2B] hover:text-white disabled:opacity-50">
-                  <svg className="h-4 w-4 text-[#8FB9FF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" /></svg>
-                  {isCreating ? 'Creating...' : 'New project'}
-                </button>
-                <div className="my-1 border-t border-[#333]" />
-                <div className="px-2.5 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#737373]">Account</div>
-                <a href="/admin" className="block rounded-lg px-2.5 py-2 text-sm text-[#D4D4D4] transition hover:bg-[#2B2B2B] hover:text-white">Admin settings</a>
-              </div>
-            </>
-          )}
-        </div>
+  const logo = (
+    <button type="button" onClick={() => goTo('/')} className="flex min-w-0 items-center gap-2 rounded-lg text-left text-[#F3F4F6] transition hover:text-white" aria-label="Go home">
+      <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-white text-[11px] font-bold text-[#111217]">C</span>
+      {!isCollapsed && <span className="truncate text-[14px] font-bold tracking-[-0.04em]">{APP_NAME}<sup className="ml-0.5 text-[7px] font-semibold tracking-normal">.new</sup></span>}
+    </button>
+  );
 
-        {/* Profile avatar */}
-        <div className="relative">
-          <button
-            onClick={() => setOpenMenu(openMenu === 'profile' ? null : 'profile')}
-            className="flex items-center gap-1.5 rounded-lg p-1 transition hover:bg-[#242424]"
-            aria-label="Open profile menu"
-          >
-            <span className="flex h-7 w-7 items-center justify-center overflow-hidden rounded-full bg-[#304D78] text-xs font-semibold text-[#CFE1FF]">
-              {profile.avatar_url ? <img src={profile.avatar_url} alt={profile.full_name || user.email} className="h-full w-full object-cover" /> : initials}
-            </span>
-          </button>
-          {openMenu === 'profile' && (
-            <>
-              <div className="fixed inset-0 z-10 bg-black/20" onClick={() => setOpenMenu(null)} />
-              <div className="absolute right-0 top-full mt-1.5 z-30 w-60 overflow-hidden rounded-xl border border-[#333] bg-[#202020] p-1.5 shadow-2xl shadow-black/40">
-                <div className="px-2.5 py-2">
-                  <p className="truncate text-sm font-medium text-white">{profile.full_name || 'Your account'}</p>
-                  <p className="truncate text-xs text-[#808080]">{user.email}</p>
-                </div>
-                <div className="my-1 border-t border-[#333]" />
-                <div className="flex items-center justify-between rounded-lg px-2.5 py-2 text-xs text-[#A3A3A3]">
-                  <span>Tokens</span>
-                  <span className="font-semibold text-[#8FB9FF]">{profile.token_balance.toLocaleString()}</span>
-                </div>
-                <a href="/admin" className="block rounded-lg px-2.5 py-2 text-sm text-[#C7C7C7] transition hover:bg-[#2B2B2B] hover:text-white">Settings</a>
-                <button onClick={() => goTo('/')} className="w-full rounded-lg px-2.5 py-2 text-left text-sm text-[#C7C7C7] transition hover:bg-[#2B2B2B] hover:text-white">Buy tokens</button>
-                <Form method="post" action="/auth/logout">
-                  <button type="submit" className="w-full rounded-lg px-2.5 py-2 text-left text-sm text-[#C7C7C7] transition hover:bg-[#2B2B2B] hover:text-white">Log out</button>
-                </Form>
-              </div>
-            </>
-          )}
-        </div>
+  const accountMenu = showProfile && (
+    <div className={`absolute z-40 mt-2 w-64 overflow-hidden rounded-xl border border-[#30333A] bg-[#202226] p-1.5 shadow-2xl shadow-black/40 ${isHeader ? 'right-0 top-full' : 'bottom-12 left-2'}`}>
+      <div className="px-2.5 py-2">
+        <p className="truncate text-sm font-medium text-white">{profile.full_name || 'Your account'}</p>
+        <p className="truncate text-xs text-[#858A94]">{user.email}</p>
       </div>
-
-      {/* Project selector */}
-      <div className="px-3 pb-2.5">
-        <div className="relative">
-          <button
-            onClick={() => setOpenMenu(openMenu === 'project' ? null : 'project')}
-            className="flex w-full max-w-full items-center gap-2 rounded-lg border border-[#2A2A2A] bg-[#1F1F1F] px-2.5 py-2 text-sm text-[#D4D4D4] transition hover:bg-[#242424] hover:text-white"
-          >
-            <svg className="h-4 w-4 shrink-0 text-[#737373]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 5.5A2.5 2.5 0 016.5 3H12l2 2h3.5A2.5 2.5 0 0120 7.5v10a2.5 2.5 0 01-2.5 2.5h-11A2.5 2.5 0 014 17.5v-12z" />
-            </svg>
-            <span className="truncate flex-1 text-left">{currentProject?.title || 'Project'}</span>
-            <svg className="h-3.5 w-3.5 shrink-0 text-[#737373]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
-            </svg>
-          </button>
-          {openMenu === 'project' && (
-            <>
-              <div className="fixed inset-0 z-10 bg-black/20" onClick={() => setOpenMenu(null)} />
-              <div className="absolute left-0 right-0 top-full z-30 mt-1 overflow-hidden rounded-xl border border-[#333] bg-[#202020] p-1.5 shadow-2xl shadow-black/40">
-                <div className="px-2.5 pb-1 pt-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#737373]">Your projects</div>
-                {isLoading ? (
-                  <div className="px-2.5 py-3 text-xs text-[#8A8A8A]">Loading...</div>
-                ) : projects.length === 0 ? (
-                  <div className="px-2.5 py-3 text-xs text-[#8A8A8A]">No projects yet</div>
-                ) : (
-                  projects.map((project) => (
-                    <div key={project.id} className="group flex items-center rounded-lg hover:bg-[#2B2B2B]">
-                      <button onClick={() => goTo(`/project/${project.id}`)} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-sm text-[#D4D4D4]">
-                        <span className="h-2 w-2 shrink-0 rounded-full bg-[#4F9CF9]" />
-                        <span className="truncate">{project.title}</span>
-                      </button>
-                      <button onClick={(event) => handleDeleteProject(project.id, event)} className="mr-1 rounded p-1.5 text-[#737373] opacity-0 transition hover:bg-red-500/10 hover:text-red-400 group-hover:opacity-100" aria-label="Delete project">
-                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M6 7h12M9 7V5h6v2m-7 0l.7 12h4.6L14 7m-4 3v6m4-6v6" /></svg>
-                      </button>
-                    </div>
-                  ))
-                )}
-                <div className="my-1 border-t border-[#333]" />
-                <button onClick={handleNewProject} disabled={isCreating} className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-[#8FB9FF] transition hover:bg-[#2B2B2B] disabled:opacity-50">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14M5 12h14" /></svg>
-                  {isCreating ? 'Creating...' : 'New project'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-
-      {/* Token balance bar */}
-      <div className="px-3 pb-3">
-        <div className="flex items-center justify-between rounded-lg bg-[#1F1F1F] px-3 py-2">
-          <span className="text-[10px] font-medium uppercase tracking-wider text-[#737373]">Tokens</span>
-          <span className="text-xs font-semibold text-[#8FB9FF]">{profile.token_balance.toLocaleString()}</span>
-        </div>
-      </div>
-
-      <div className="border-t border-[#2B2B2B]" />
+      <div className="my-1 border-t border-[#30333A]" />
+      <button type="button" onClick={() => goTo('/admin/settings')} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-[#C9CBD1] transition hover:bg-[#2C2F35] hover:text-white"><MenuIcon name="settings" className="h-4 w-4" />Settings</button>
+      <button type="button" onClick={() => goTo('/admin/settings')} className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-[#C9CBD1] transition hover:bg-[#2C2F35] hover:text-white"><MenuIcon name="subscription" className="h-4 w-4" />Subscriptions</button>
+      <Form method="post" action="/auth/logout">
+        <button type="submit" className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-sm text-[#C9CBD1] transition hover:bg-[#2C2F35] hover:text-white"><MenuIcon name="logout" className="h-4 w-4" />Sign out</button>
+      </Form>
     </div>
   );
+
+  const projectMenu = showProjects && (
+    <div className={`absolute z-40 mt-2 w-72 overflow-hidden rounded-xl border border-[#30333A] bg-[#202226] p-1.5 shadow-2xl shadow-black/40 ${isHeader ? 'right-0 top-full' : 'left-2 top-20'}`}>
+      <div className="flex items-center justify-between px-2.5 py-1.5"><span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#858A94]">Projects</span><button type="button" onClick={handleNewProject} disabled={isCreating} className="text-[11px] font-medium text-[#78B7FF] hover:text-white">{isCreating ? 'Creating...' : 'New project'}</button></div>
+      <div className="max-h-72 overflow-y-auto">
+        {isLoading ? <p className="px-2.5 py-4 text-xs text-[#858A94]">Loading projects...</p> : filteredProjects.length === 0 ? <p className="px-2.5 py-4 text-xs text-[#858A94]">No projects found</p> : filteredProjects.map((project) => (
+          <div key={project.id} className="group flex items-center rounded-lg hover:bg-[#2C2F35]">
+            <button type="button" onClick={() => goTo(`/project/${project.id}`)} className="flex min-w-0 flex-1 items-center gap-2.5 px-2.5 py-2 text-left text-sm text-[#D4D6DB]"><span className="h-1.5 w-1.5 shrink-0 rounded-full bg-[#5FA9FF]" /><span className="truncate">{project.title}</span></button>
+            <button type="button" onClick={(event) => handleDeleteProject(project.id, event)} className="mr-1 rounded p-1.5 text-[#70757F] opacity-0 transition hover:text-red-300 group-hover:opacity-100" aria-label="Delete project"><span className="text-xs">×</span></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  if (isHeader) {
+    return (
+      <div ref={menuRef} className="relative flex h-12 shrink-0 items-center justify-between border-b border-[#2B2D32] bg-[#1A1B1E] px-3">
+        <div className="flex items-center gap-3">{logo}<button type="button" onClick={() => setShowSearch(true)} className="hidden items-center gap-2 rounded-md border border-[#30333A] bg-[#202226] px-2.5 py-1.5 text-[11px] text-[#858A94] transition hover:border-[#4A505A] hover:text-white sm:flex"><MenuIcon name="search" className="h-3.5 w-3.5" /><span>Search</span><kbd className="rounded border border-[#3A3D44] px-1 text-[9px]">⌘K</kbd></button></div>
+        <div className="relative flex items-center gap-1"><button type="button" onClick={() => setShowProjects((current) => !current)} className="rounded-md p-2 text-[#858A94] transition hover:bg-[#282B31] hover:text-white" aria-label="Open projects"><MenuIcon name="projects" /></button><button type="button" onClick={() => setShowProfile((current) => !current)} className="rounded-md p-1 text-[#858A94] transition hover:bg-[#282B31] hover:text-white" aria-label="Open account"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#E47AC7] text-[10px] font-bold text-[#30152A]">{initials}</span></button>{projectMenu}{accountMenu}</div>
+        {showSearch && <SearchModal query={query} setQuery={setQuery} projects={filteredProjects} onClose={() => { setShowSearch(false); setQuery(''); }} onSelect={(id) => { setShowSearch(false); setQuery(''); navigate(`/project/${id}`); }} />}
+      </div>
+    );
+  }
+
+  return (
+    <aside ref={menuRef} className={`relative flex h-full shrink-0 flex-col border-r border-[#27292E] bg-[#111214] transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] ${isCollapsed ? 'w-[64px]' : 'w-[224px]'}`}>
+      <div className="flex h-14 items-center justify-between px-3">{logo}<button type="button" onClick={() => setIsCollapsed((current) => !current)} className="rounded-md p-1.5 text-[#777C86] transition hover:bg-[#24272C] hover:text-white" aria-label={isCollapsed ? 'Expand menu' : 'Collapse menu'}><MenuIcon name="collapse" className="h-4 w-4" /></button></div>
+      <div className="px-2 pb-3"><button type="button" onClick={() => setShowSearch(true)} className={`flex h-8 w-full items-center rounded-md text-[11px] text-[#858A94] transition hover:bg-[#24272C] hover:text-white ${isCollapsed ? 'justify-center' : 'gap-2 px-2'}`}><MenuIcon name="search" className="h-3.5 w-3.5" />{!isCollapsed && <><span className="flex-1 text-left">Search</span><kbd className="rounded border border-[#363940] px-1 text-[9px]">⌘K</kbd></>}</button></div>
+      <nav className="space-y-1 px-2">
+        <NavItem icon="home" label="Home" collapsed={isCollapsed} active={isHome} onClick={() => goTo('/')} />
+        <NavItem icon="projects" label="Projects" collapsed={isCollapsed} active={showProjects} onClick={() => setShowProjects((current) => !current)} />
+      </nav>
+      {projectMenu}
+      <div className="mx-2 my-4 border-t border-[#27292E]" />
+      <nav className="space-y-1 px-2"><NavItem icon="help" label="Help center" collapsed={isCollapsed} onClick={() => window.open('https://support.bolt.new', '_blank', 'noopener,noreferrer')} /><NavItem icon="release" label="Release notes" collapsed={isCollapsed} onClick={() => window.open('https://support.bolt.new', '_blank', 'noopener,noreferrer')} /></nav>
+      <div className="mt-auto relative border-t border-[#27292E] p-2"><button type="button" onClick={() => setShowProfile((current) => !current)} className={`flex w-full items-center rounded-lg p-2 text-left transition hover:bg-[#24272C] ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E47AC7] text-[11px] font-bold text-[#30152A]">{initials}</span>{!isCollapsed && <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-white">{profile.full_name || user.email}</span><span className="block truncate text-[10px] text-[#858A94]">{user.email}</span></span>}{!isCollapsed && <MenuIcon name="chevron" className="h-3.5 w-3.5 text-[#777C86]" />}</button>{accountMenu}</div>
+      {showSearch && <SearchModal query={query} setQuery={setQuery} projects={filteredProjects} onClose={() => { setShowSearch(false); setQuery(''); }} onSelect={(id) => { setShowSearch(false); setQuery(''); navigate(`/project/${id}`); }} />}
+    </aside>
+  );
+}
+
+function NavItem({ icon, label, collapsed, active = false, onClick }: { icon: MenuIconName; label: string; collapsed: boolean; active?: boolean; onClick: () => void }) {
+  return <button type="button" onClick={onClick} title={collapsed ? label : undefined} className={`flex h-8 w-full items-center rounded-md text-[11px] transition ${collapsed ? 'justify-center' : 'gap-2.5 px-2'} ${active ? 'bg-[#24272C] text-white' : 'text-[#B1B4BB] hover:bg-[#202328] hover:text-white'}`}><MenuIcon name={icon} className="h-3.5 w-3.5" />{!collapsed && <span>{label}</span>}</button>;
+}
+
+function SearchModal({ query, setQuery, projects, onClose, onSelect }: { query: string; setQuery: (value: string) => void; projects: Project[]; onClose: () => void; onSelect: (id: string) => void }) {
+  return <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 px-4 pt-[16vh] backdrop-blur-sm" role="dialog" aria-modal="true" aria-label="Search projects" onMouseDown={onClose}><div className="w-full max-w-lg overflow-hidden rounded-xl border border-[#3A3D44] bg-[#202226] shadow-2xl" onMouseDown={(event) => event.stopPropagation()}><div className="flex items-center gap-2 border-b border-[#30333A] px-4"><MenuIcon name="search" className="h-4 w-4 text-[#858A94]" /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search projects" className="h-12 flex-1 bg-transparent text-sm text-white outline-none placeholder:text-[#70757F]" /><kbd className="rounded border border-[#3A3D44] px-1.5 py-0.5 text-[10px] text-[#858A94]">ESC</kbd></div><div className="max-h-72 overflow-y-auto p-2">{projects.length === 0 ? <p className="px-3 py-5 text-center text-xs text-[#858A94]">No projects found</p> : projects.map((project) => <button type="button" key={project.id} onClick={() => onSelect(project.id)} className="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-[#D4D6DB] transition hover:bg-[#2C2F35] hover:text-white"><MenuIcon name="projects" className="h-4 w-4 text-[#6CAFFF]" /><span className="truncate">{project.title}</span></button>)}</div></div></div>;
 }

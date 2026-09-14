@@ -135,7 +135,7 @@ export default function ProjectWorkspace({ projectId, projectTitle, projectType,
     <div className="flex h-screen bg-[#171717]">
       {/* Left sidebar: logo + nav + chat */}
       <aside className="flex w-full max-w-none shrink-0 flex-col border-b border-[#2B2B2B] bg-[#1B1B1B] lg:w-[360px] lg:border-b-0 lg:border-r">
-        <MenuClient user={user} profile={profile} />
+        <MenuClient user={user} profile={profile} variant="header" />
 
         {/* Chat section */}
         <div className="flex min-h-0 flex-1 flex-col">
