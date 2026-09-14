@@ -27,6 +27,40 @@ Reglas:
 - Despues de los bloques de codigo, puedes incluir una breve explicacion del proyecto
 - Si el usuario pide modificar un archivo existente, envia el archivo completo con los cambios aplicados`;
 
+function sseResponse() {
+  return new Response(
+    new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        const send = (data: Record<string, unknown>) => {
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(data)}\n\n`));
+        };
+
+        try {
+          await streamChat(send, controller);
+        } catch (err) {
+          send({ type: 'error', error: 'Error inesperado en el servidor.' });
+          console.error('Stream error:', err);
+        } finally {
+          controller.close();
+        }
+      },
+    }),
+    {
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+    }
+  );
+}
+
+let streamChat: (
+  send: (data: Record<string, unknown>) => void,
+  controller: ReadableStreamDefaultController
+) => Promise<void>;
+
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
     return Response.json({ error: 'Method not allowed' }, { status: 405 });
@@ -95,7 +129,6 @@ export async function action({ request }: ActionFunctionArgs) {
 
   const tokenBalance = profile.token_balance;
 
-  // Resolve which model to use: explicit modelId from request > user's preferred > default
   const targetModelId = modelId || profile.preferred_model_id;
 
   let apiModel = DEFAULT_MODEL_ID;
@@ -114,7 +147,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  // Estimate tokens: ~4 chars per token for input, 1.5x for output
+  // Estimate tokens
   const lastMessage = messages[messages.length - 1];
   const estimatedInputTokens = Math.ceil(
     messages.reduce((sum, m) => sum + m.content.length, 0) / 4
@@ -140,160 +173,187 @@ export async function action({ request }: ActionFunctionArgs) {
     .update({ model_id: apiModel })
     .eq('id', projectId);
 
-  // Call OpenRouter server-side
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
-    console.error('OPENROUTER_API_KEY is not configured');
     return Response.json(
       { error: 'El servicio de IA no esta configurado.' },
       { status: 503, headers }
     );
   }
 
-  // Build the message array with system prompt prepended
   const apiMessages = [
     { role: 'system' as const, content: SYSTEM_PROMPT },
     ...messages.map(({ role, content }) => ({ role, content })),
   ];
 
-  let openrouterResponse: Response;
-  try {
-    openrouterResponse = await fetch(OPENROUTER_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: apiModel,
-        messages: apiMessages,
-      }),
-    });
-  } catch {
-    console.error('OpenRouter request failed');
-    return Response.json(
-      { error: 'Error al contactar el servicio de IA.' },
-      { status: 502, headers }
-    );
-  }
+  // Capture variables for the stream closure
+  const supabaseRef = supabase;
+  const userId = user.id;
+  const projectIdRef = projectId;
+  const messagesRef = messages;
+  const estimatedInputTokensRef = estimatedInputTokens;
+  const estimatedOutputTokensRef = estimatedOutputTokens;
+  const tokenCostMultiplierRef = tokenCostMultiplier;
 
-  if (!openrouterResponse.ok) {
-    console.error('OpenRouter error:', openrouterResponse.status);
-    return Response.json(
-      { error: 'El servicio de IA devolvio un error.' },
-      { status: 502, headers }
-    );
-  }
-
-  const data = await openrouterResponse.json();
-  const assistantContent: string =
-    data.choices?.[0]?.message?.content || 'No se pudo generar una respuesta.';
-
-  // Parse generated files from the response
-  const parsedFiles = parseGeneratedFiles(assistantContent);
-  const displayContent = parsedFiles.length > 0
-    ? stripFileBlocks(assistantContent)
-    : assistantContent;
-
-  const actualInputTokens: number = data.usage?.prompt_tokens || estimatedInputTokens;
-  const actualOutputTokens: number =
-    data.usage?.completion_tokens || estimatedOutputTokens;
-  const actualTotalTokens = Math.ceil(
-    (actualInputTokens + actualOutputTokens) * tokenCostMultiplier
-  );
-
-  // Deduct tokens via service role client (deduct_tokens is service-role only)
-  const serviceClient = createSupabaseServiceClient();
-  const { data: newBalance, error: deductError } = await serviceClient.rpc(
-    'deduct_tokens',
-    {
-      p_user_id: user.id,
-      p_amount: actualTotalTokens,
+  streamChat = async (send, _controller) => {
+    let openrouterResponse: Response;
+    try {
+      openrouterResponse = await fetch(OPENROUTER_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+        },
+        body: JSON.stringify({
+          model: apiModel,
+          messages: apiMessages,
+          stream: true,
+        }),
+      });
+    } catch {
+      send({ type: 'error', error: 'Error al contactar el servicio de IA.' });
+      return;
     }
-  );
 
-  if (deductError) {
-    console.error('Token deduction failed:', deductError);
-    return Response.json(
-      { error: 'Error al descontar tokens.' },
-      { status: 500, headers }
-    );
-  }
+    if (!openrouterResponse.ok) {
+      send({ type: 'error', error: 'El servicio de IA devolvio un error.' });
+      return;
+    }
 
-  // Save parsed files to project_files (upsert by project_id + path)
-  let savedFilesCount = 0;
-  if (parsedFiles.length > 0) {
-    for (const file of parsedFiles) {
-      const { data: existing } = await supabase
-        .from('project_files')
-        .select('id, version')
-        .eq('project_id', projectId)
-        .eq('path', file.path)
-        .maybeSingle();
+    // Read the SSE stream from OpenRouter
+    const reader = openrouterResponse.body?.getReader();
+    if (!reader) {
+      send({ type: 'error', error: 'No se pudo leer el stream.' });
+      return;
+    }
 
-      if (existing) {
-        const { error: updateErr } = await supabase
-          .from('project_files')
-          .update({
-            content: file.content,
-            language: file.language,
-            version: (existing.version || 1) + 1,
-          })
-          .eq('id', existing.id);
+    const decoder = new TextDecoder();
+    let fullContent = '';
+    let buffer = '';
 
-        if (!updateErr) savedFilesCount++;
-      } else {
-        const { error: insertErr } = await supabase
-          .from('project_files')
-          .insert({
-            project_id: projectId,
-            path: file.path,
-            content: file.content,
-            language: file.language,
-          });
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
 
-        if (!insertErr) savedFilesCount++;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const jsonStr = line.slice(6).trim();
+        if (!jsonStr || jsonStr === '[DONE]') continue;
+
+        try {
+          const chunk = JSON.parse(jsonStr);
+          const token: string = chunk.choices?.[0]?.delta?.content || '';
+          if (token) {
+            fullContent += token;
+            send({ type: 'token', content: token });
+          }
+        } catch {
+          // partial JSON, skip
+        }
       }
     }
-  }
 
-  // Build the assistant message (store the display content, not the raw file blocks)
-  const assistantMessage: ChatMessage = {
-    role: 'assistant',
-    content: displayContent,
-    timestamp: new Date().toISOString(),
-  };
+    // Process the complete response
+    const assistantContent = fullContent || 'No se pudo generar una respuesta.';
 
-  const finalMessages = [...messages, assistantMessage];
+    const parsedFiles = parseGeneratedFiles(assistantContent);
+    const displayContent = parsedFiles.length > 0
+      ? stripFileBlocks(assistantContent)
+      : assistantContent;
 
-  // Update project in Supabase
-  const updateData: Record<string, unknown> = {
-    messages: finalMessages,
-    updated_at: new Date().toISOString(),
-  };
+    // Estimate token usage (OpenRouter streaming doesn't always return usage)
+    const actualTotalTokens = Math.ceil(
+      (estimatedInputTokensRef + estimatedOutputTokensRef) * tokenCostMultiplierRef
+    );
 
-  // Set title from first user message if this is the first exchange
-  if (messages.length === 1) {
-    updateData.title = messages[0].content.slice(0, 50);
-  }
+    // Deduct tokens
+    const serviceClient = createSupabaseServiceClient();
+    const { data: newBalance, error: deductError } = await serviceClient.rpc(
+      'deduct_tokens',
+      {
+        p_user_id: userId,
+        p_amount: actualTotalTokens,
+      }
+    );
 
-  const { error: updateError } = await supabase
-    .from('projects')
-    .update(updateData)
-    .eq('id', projectId);
+    if (deductError) {
+      send({ type: 'error', error: 'Error al descontar tokens.' });
+      return;
+    }
 
-  if (updateError) {
-    console.error('Project update failed:', updateError);
-  }
+    // Save parsed files
+    let savedFilesCount = 0;
+    if (parsedFiles.length > 0) {
+      for (const file of parsedFiles) {
+        const { data: existing } = await supabaseRef
+          .from('project_files')
+          .select('id, version')
+          .eq('project_id', projectIdRef)
+          .eq('path', file.path)
+          .maybeSingle();
 
-  return Response.json(
-    {
-      message: assistantMessage,
+        if (existing) {
+          const { error: updateErr } = await supabaseRef
+            .from('project_files')
+            .update({
+              content: file.content,
+              language: file.language,
+              version: (existing.version || 1) + 1,
+            })
+            .eq('id', existing.id);
+
+          if (!updateErr) savedFilesCount++;
+        } else {
+          const { error: insertErr } = await supabaseRef
+            .from('project_files')
+            .insert({
+              project_id: projectIdRef,
+              path: file.path,
+              content: file.content,
+              language: file.language,
+            });
+
+          if (!insertErr) savedFilesCount++;
+        }
+      }
+    }
+
+    // Build assistant message
+    const assistantMessage: ChatMessage = {
+      role: 'assistant',
+      content: displayContent,
+      timestamp: new Date().toISOString(),
+    };
+
+    const finalMessages = [...messagesRef, assistantMessage];
+
+    const updateData: Record<string, unknown> = {
+      messages: finalMessages,
+      updated_at: new Date().toISOString(),
+    };
+
+    if (messagesRef.length === 1) {
+      updateData.title = messagesRef[0].content.slice(0, 50);
+    }
+
+    await supabaseRef
+      .from('projects')
+      .update(updateData)
+      .eq('id', projectIdRef);
+
+    // Send done event
+    send({
+      type: 'done',
+      content: displayContent,
+      filesGenerated: savedFilesCount,
       tokenBalance: newBalance,
       tokensUsed: actualTotalTokens,
-      model: apiModel,
-      filesGenerated: savedFilesCount,
-    },
-    { headers }
-  );
+    });
+  };
+
+  return sseResponse();
 }
