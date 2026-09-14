@@ -32,7 +32,7 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
   const [projects, setProjects] = useState<Project[]>([]);
   const [isCreating, setIsCreating] = useState(false);
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [showProfile, setShowProfile] = useState(false);
+  const [showProfile, setShowProfile] = useState<'top' | 'bottom' | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
@@ -48,7 +48,7 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
 
   useEffect(() => {
     function closeMenus(event: globalThis.MouseEvent) {
-      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setShowProfile(false);
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) setShowProfile(null);
     }
     function handleShortcut(event: globalThis.KeyboardEvent) {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); setShowSearch(true); }
@@ -74,14 +74,14 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
     }
   }
 
-  function goTo(path: string) { setShowProfile(false); navigate(path); }
+  function goTo(path: string) { setShowProfile(null); navigate(path); }
 
   const initials = (profile.full_name || user.email).charAt(0).toUpperCase();
   const filteredProjects = projects.filter((p) => p.title.toLowerCase().includes(query.trim().toLowerCase()));
   const isHome = location.pathname === '/';
 
   const accountMenu = showProfile && (
-    <div className={`absolute z-40 w-64 overflow-hidden rounded-xl border border-[#30333A] bg-[#202226] p-1.5 shadow-2xl shadow-black/40 ${isHeader ? 'right-0 top-full mt-2' : 'left-1 top-full mt-1'}`}>
+    <div className={`absolute z-40 w-64 overflow-hidden rounded-xl border border-[#30333A] bg-[#202226] p-1.5 shadow-2xl shadow-black/40 ${isHeader ? 'right-0 top-full mt-2' : showProfile === 'bottom' ? 'left-1 bottom-full mb-1' : 'left-1 top-full mt-1'}`}>
       <div className="px-2.5 py-2">
         <p className="truncate text-sm font-medium text-white">{profile.full_name || 'Your account'}</p>
         <p className="truncate text-xs text-[#858A94]">{user.email}</p>
@@ -107,7 +107,7 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
         </div>
         <div className="relative flex items-center gap-1">
           <button type="button" onClick={() => goTo('/projects')} className="rounded-md p-2 text-[#858A94] transition hover:bg-[#282B31] hover:text-white" aria-label="Open projects"><MenuIcon name="projects" /></button>
-          <button type="button" onClick={() => setShowProfile((c) => !c)} className="rounded-md p-1 text-[#858A94] transition hover:bg-[#282B31] hover:text-white" aria-label="Open account"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#E47AC7] text-[10px] font-bold text-[#30152A]">{initials}</span></button>
+          <button type="button" onClick={() => setShowProfile((c) => (c ? null : 'top'))} className="rounded-md p-1 text-[#858A94] transition hover:bg-[#282B31] hover:text-white" aria-label="Open account"><span className="flex h-6 w-6 items-center justify-center rounded-full bg-[#E47AC7] text-[10px] font-bold text-[#30152A]">{initials}</span></button>
           {accountMenu}
         </div>
         {showSearch && <SearchModal query={query} setQuery={setQuery} projects={filteredProjects} onClose={() => { setShowSearch(false); setQuery(''); }} onSelect={(id) => { setShowSearch(false); setQuery(''); navigate(`/project/${id}`); }} />}
@@ -129,7 +129,7 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
 
       {/* Row 2: Account avatar with dropdown */}
       <div className="relative px-2 pb-2">
-        <button type="button" onClick={() => setShowProfile((c) => !c)} className={`flex w-full items-center rounded-lg p-2 text-left transition hover:bg-[#24272C] ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+        <button type="button" onClick={() => setShowProfile((c) => (c ? null : 'top'))} className={`flex w-full items-center rounded-lg p-2 text-left transition hover:bg-[#24272C] ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E47AC7] text-[11px] font-bold text-[#30152A]">{initials}</span>
           {!isCollapsed && <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-white">{profile.full_name || user.email}</span><span className="block truncate text-[10px] text-[#858A94]">{user.email}</span></span>}
           {!isCollapsed && <MenuIcon name="chevron" className="h-3.5 w-3.5 text-[#777C86]" />}
@@ -148,6 +148,16 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
         <NavItem icon="help" label="Help center" collapsed={isCollapsed} onClick={() => window.open('https://support.bolt.new', '_blank', 'noopener,noreferrer')} />
         <NavItem icon="release" label="Release notes" collapsed={isCollapsed} onClick={() => window.open('https://support.bolt.new', '_blank', 'noopener,noreferrer')} />
       </nav>
+
+      {/* Bottom: Account avatar with dropdown opening upward */}
+      <div className="mt-auto relative border-t border-[#27292E] p-2">
+        <button type="button" onClick={() => setShowProfile((c) => (c ? null : 'bottom'))} className={`flex w-full items-center rounded-lg p-2 text-left transition hover:bg-[#24272C] ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
+          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E47AC7] text-[11px] font-bold text-[#30152A]">{initials}</span>
+          {!isCollapsed && <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-white">{profile.full_name || user.email}</span><span className="block truncate text-[10px] text-[#858A94]">{user.email}</span></span>}
+          {!isCollapsed && <MenuIcon name="chevron" className="h-3.5 w-3.5 text-[#777C86]" />}
+        </button>
+        {accountMenu}
+      </div>
 
       {showSearch && <SearchModal query={query} setQuery={setQuery} projects={filteredProjects} onClose={() => { setShowSearch(false); setQuery(''); }} onSelect={(id) => { setShowSearch(false); setQuery(''); navigate(`/project/${id}`); }} />}
     </aside>
