@@ -8,9 +8,10 @@ interface GitHubPanelProps {
   compact?: boolean;
   expanded?: boolean;
   onOpen?: () => void;
+  autoOpen?: boolean;
 }
 
-export default function GitHubPanel({ projectId, onImported, compact, expanded = false, onOpen }: GitHubPanelProps) {
+export default function GitHubPanel({ projectId, onImported, compact, expanded = false, onOpen, autoOpen = false }: GitHubPanelProps) {
   const [connection, setConnection] = useState<GitHubConnection | null>(null);
   const [loading, setLoading] = useState(true);
   const [showImport, setShowImport] = useState(false);
@@ -29,6 +30,10 @@ export default function GitHubPanel({ projectId, onImported, compact, expanded =
   useEffect(() => {
     loadConnection();
   }, []);
+
+  useEffect(() => {
+    if (autoOpen) setShowPush(true);
+  }, [autoOpen]);
 
   async function loadConnection() {
     setLoading(true);

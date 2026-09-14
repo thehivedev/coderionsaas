@@ -16,6 +16,7 @@ interface ProjectWorkspaceProps {
   models: AIModel[];
   initialPrompt?: string;
   planMode?: boolean;
+  source?: string;
   user: { id: string; email: string };
   profile: Profile;
 }
@@ -34,7 +35,7 @@ function Icon({ name, className = 'h-4 w-4' }: { name: 'send' | 'code' | 'eye' |
   return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>{paths[name]}</svg>;
 }
 
-export default function ProjectWorkspace({ projectId, projectTitle, projectType, initialMessages, initialFiles, models, initialPrompt, planMode, user, profile }: ProjectWorkspaceProps) {
+export default function ProjectWorkspace({ projectId, projectTitle, projectType, initialMessages, initialFiles, models, initialPrompt, planMode, source, user, profile }: ProjectWorkspaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages || []);
   const [files, setFiles] = useState<ProjectFile[]>(initialFiles || []);
   const [input, setInput] = useState('');
@@ -47,7 +48,7 @@ export default function ProjectWorkspace({ projectId, projectTitle, projectType,
   const [selectedFile, setSelectedFile] = useState<ProjectFile | null>(null);
   const [showFilePanel, setShowFilePanel] = useState(false);
   const [editingFile, setEditingFile] = useState<ProjectFile | null>(null);
-  const [expandedToolbar, setExpandedToolbar] = useState<'files' | 'preview' | 'github'>('preview');
+  const [expandedToolbar, setExpandedToolbar] = useState<'files' | 'preview' | 'github'>(source === 'github' ? 'github' : 'preview');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, streamingContent]);
@@ -246,7 +247,7 @@ export default function ProjectWorkspace({ projectId, projectTitle, projectType,
             </button>
           </div>
 
-          <GitHubPanel projectId={projectId} onImported={refreshFiles} compact expanded={expandedToolbar === 'github'} onOpen={() => setExpandedToolbar('github')} />
+          <GitHubPanel projectId={projectId} onImported={refreshFiles} compact expanded={expandedToolbar === 'github'} onOpen={() => setExpandedToolbar('github')} autoOpen={source === 'github'} />
         </div>
 
         {/* Expandable file explorer + main content */}

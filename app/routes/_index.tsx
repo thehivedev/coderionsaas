@@ -175,7 +175,7 @@ function PublicLanding() {
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-1.5 text-[10px] text-white/60">
           <span className="mr-1">or start from</span>
-          <Link to="/auth/register" className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><GitHubIcon /> <span className="font-semibold">GitHub</span> <ArrowIcon /></Link>
+          <button type="button" onClick={() => setShowSignup(true)} className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><GitHubIcon /> <span className="font-semibold">GitHub</span> <ArrowIcon /></button>
         </div>
       </main>
 
@@ -207,7 +207,7 @@ function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
   const projectType = searchParams.get('type') || '';
   const planMode = searchParams.get('plan') === 'true';
 
-  async function handleNewProject(prompt?: string) {
+  async function handleNewProject(prompt?: string, source?: string) {
     if (isCreating) return;
     setIsCreating(true);
     const project = await createProject(data.user.id, projectType || undefined);
@@ -215,6 +215,7 @@ function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
       const params = new URLSearchParams();
       if (prompt) params.set('prompt', prompt);
       if (planMode) params.set('plan', 'true');
+      if (source) params.set('source', source);
       navigate(`/project/${project.id}${params.toString() ? `?${params.toString()}` : ''}`);
     }
     setIsCreating(false);
@@ -233,7 +234,10 @@ function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
             <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-[#1688ee]/10 ring-1 ring-[#1688ee]/30"><BoltMark /></div>
             <h1 className="mb-4 text-4xl font-bold tracking-tight text-white sm:text-5xl">{APP_NAME}</h1>
             <p className="mb-8 text-lg text-[#A3A3A3]">Describe a web project and the AI generates all the files for you.</p>
-            <button onClick={() => handleNewProject()} disabled={isCreating} className="inline-flex items-center gap-2 rounded-xl bg-[#1688ee] px-6 py-3 font-semibold text-white transition-all hover:bg-[#3298ff] disabled:opacity-50">{isCreating ? 'Creating...' : 'Create new project'}{!isCreating && <ArrowIcon />}</button>
+            <div className="flex items-center justify-center gap-3">
+              <button onClick={() => handleNewProject()} disabled={isCreating} className="inline-flex items-center gap-2 rounded-xl bg-[#1688ee] px-6 py-3 font-semibold text-white transition-all hover:bg-[#3298ff] disabled:opacity-50">{isCreating ? 'Creating...' : 'Create new project'}{!isCreating && <ArrowIcon />}</button>
+              <button onClick={() => handleNewProject(undefined, 'github')} disabled={isCreating} className="inline-flex items-center gap-2 rounded-xl bg-[#262626] px-5 py-3 text-sm font-medium text-white ring-1 ring-[#2F2F2F] transition-all hover:bg-[#2F2F2F] disabled:opacity-50"><GitHubIcon /> Start from GitHub</button>
+            </div>
           </div>
           <div className="mb-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-2xl bg-[#262626] p-5 ring-1 ring-[#2F2F2F]"><h2 className="mb-1 text-sm font-medium text-[#A3A3A3]">Available tokens</h2><p className="text-2xl font-bold text-white">{data.profile.token_balance.toLocaleString()}</p></div>
