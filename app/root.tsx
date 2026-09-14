@@ -4,6 +4,8 @@ import {
   Outlet,
   Scripts,
   ScrollRestoration,
+  useRouteError,
+  isRouteErrorResponse,
 } from "@remix-run/react";
 import type { LinksFunction } from "@remix-run/node";
 import stylesheet from "~/tailwind.css?url";
@@ -42,4 +44,27 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
 export default function App() {
   return <Outlet />;
+}
+
+export function ErrorBoundary() {
+  const error = useRouteError();
+  const message = isRouteErrorResponse(error)
+    ? `${error.status} ${error.statusText}: ${error.data}`
+    : error instanceof Error
+      ? error.message
+      : String(error);
+
+  return (
+    <div className="min-h-screen bg-[#171717] text-white flex items-center justify-center p-8">
+      <div className="max-w-lg w-full">
+        <h1 className="text-2xl font-bold mb-4">Something went wrong</h1>
+        <pre className="text-sm text-red-400 bg-[#262626] rounded-lg p-4 overflow-auto whitespace-pre-wrap">
+          {message}
+        </pre>
+        <a href="/" className="inline-block mt-4 text-[#9E7FFF] hover:underline">
+          Go home
+        </a>
+      </div>
+    </div>
+  );
 }
