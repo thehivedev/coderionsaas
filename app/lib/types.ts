@@ -40,3 +40,31 @@ export interface AIModel {
   created_at: string;
   updated_at: string;
 }
+
+export interface Project {
+  id: string;
+  user_id: string;
+  title: string;
+  model_id: string | null;
+  status: 'active' | 'archived';
+  messages: ChatMessage[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProjectFile {
+  id: string;
+  project_id: string;
+  path: string;
+  content: string;
+  language: string | null;
+  version: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ParsedFile {
+  path: string;
+  content: string;
+  language: string;
+}

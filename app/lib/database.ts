@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Chat, Profile } from './types';
+import type { Chat, Profile, Project, ProjectFile } from './types';
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -79,4 +79,94 @@ export async function deleteChat(chatId: string): Promise<boolean> {
   return true;
 }
 
+export async function getProjects(userId: string): Promise<Project[]> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('user_id', userId)
+    .order('updated_at', { ascending: false });
 
+  if (error) {
+    console.error('Error fetching projects:', error);
+    return [];
+  }
+
+  return (data || []) as Project[];
+}
+
+export async function getProject(projectId: string): Promise<Project | null> {
+  const { data, error } = await supabase
+    .from('projects')
+    .select('*')
+    .eq('id', projectId)
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error fetching project:', error);
+    return null;
+  }
+
+  return data as Project | null;
+}
+
+export async function createProject(userId: string): Promise<Project | null> {
+  const { data, error } = await supabase
+    .from('projects')
+    .insert({
+      user_id: userId,
+      title: 'Nuevo proyecto',
+      messages: [],
+    })
+    .select()
+    .maybeSingle();
+
+  if (error) {
+    console.error('Error creating project:', error);
+    return null;
+  }
+
+  return data as Project | null;
+}
+
+export async function deleteProject(projectId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('projects')
+    .delete()
+    .eq('id', projectId);
+
+  if (error) {
+    console.error('Error deleting project:', error);
+    return false;
+  }
+
+  return true;
+}
+
+export async function getProjectFiles(projectId: string): Promise<ProjectFile[]> {
+  const { data, error } = await supabase
+    .from('project_files')
+    .select('*')
+    .eq('project_id', projectId)
+    .order('path', { ascending: true });
+
+  if (error) {
+    console.error('Error fetching project files:', error);
+    return [];
+  }
+
+  return (data || []) as ProjectFile[];
+}
+
+export async function deleteProjectFile(fileId: string): Promise<boolean> {
+  const { error } = await supabase
+    .from('project_files')
+    .delete()
+    .eq('id', fileId);
+
+  if (error) {
+    console.error('Error deleting project file:', error);
+    return false;
+  }
+
+  return true;
+}

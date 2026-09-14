@@ -1,9 +1,31 @@
 import type { ActionFunctionArgs } from '@remix-run/node';
 import { createSupabaseServerClient, createSupabaseServiceClient } from '~/lib/supabaseServer';
+import { parseGeneratedFiles, stripFileBlocks } from '~/lib/parser';
 import type { ChatMessage } from '~/lib/types';
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_MODEL_ID = 'deepseek/deepseek-v4-pro-0813';
+
+const SYSTEM_PROMPT = `Eres un generador de proyectos web. Cuando el usuario te pida crear o modificar un proyecto, respondes con archivos completos usando bloques de codigo con la ruta del archivo.
+
+Formato obligatorio para cada archivo:
+
+\`\`\`tsx filepath:src/App.tsx
+import React from 'react';
+
+export default function App() {
+  return <div>Hola Mundo</div>;
+}
+\`\`\`
+
+Reglas:
+- Cada bloque de codigo debe empezar con el lenguaje seguido de "filepath:" y la ruta del archivo
+- Incluye TODOS los archivos necesarios para que el proyecto funcione
+- Usa rutas relativas desde la raiz del proyecto (ej: src/App.tsx, package.json, vite.config.ts)
+- No abrevies el codigo ni uses comentarios como "// resto del codigo"
+- Escribe cada archivo completo, listo para usar
+- Despues de los bloques de codigo, puedes incluir una breve explicacion del proyecto
+- Si el usuario pide modificar un archivo existente, envia el archivo completo con los cambios aplicados`;
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
@@ -23,36 +45,36 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  let body: { chatId?: string; messages?: ChatMessage[]; modelId?: string };
+  let body: { projectId?: string; messages?: ChatMessage[]; modelId?: string };
   try {
     body = await request.json();
   } catch {
     return Response.json(
-      { error: 'Cuerpo de la petición inválido' },
+      { error: 'Cuerpo de la peticion invalido' },
       { status: 400, headers }
     );
   }
 
-  const { chatId, messages, modelId } = body;
+  const { projectId, messages, modelId } = body;
 
-  if (!chatId || !messages || !Array.isArray(messages) || messages.length === 0) {
+  if (!projectId || !messages || !Array.isArray(messages) || messages.length === 0) {
     return Response.json(
-      { error: 'Faltan parámetros requeridos' },
+      { error: 'Faltan parametros requeridos' },
       { status: 400, headers }
     );
   }
 
-  // Verify chat belongs to the authenticated user
-  const { data: chat, error: chatError } = await supabase
-    .from('chats')
+  // Verify project belongs to the authenticated user
+  const { data: project, error: projectError } = await supabase
+    .from('projects')
     .select('id, user_id')
-    .eq('id', chatId)
+    .eq('id', projectId)
     .eq('user_id', user.id)
     .maybeSingle();
 
-  if (chatError || !chat) {
+  if (projectError || !project) {
     return Response.json(
-      { error: 'Chat no encontrado' },
+      { error: 'Proyecto no encontrado' },
       { status: 404, headers }
     );
   }
@@ -112,21 +134,27 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  // Save the selected model on the chat
+  // Save the selected model on the project
   await supabase
-    .from('chats')
-    .update({ model: apiModel })
-    .eq('id', chatId);
+    .from('projects')
+    .update({ model_id: apiModel })
+    .eq('id', projectId);
 
   // Call OpenRouter server-side
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
     console.error('OPENROUTER_API_KEY is not configured');
     return Response.json(
-      { error: 'El servicio de IA no está configurado.' },
+      { error: 'El servicio de IA no esta configurado.' },
       { status: 503, headers }
     );
   }
+
+  // Build the message array with system prompt prepended
+  const apiMessages = [
+    { role: 'system' as const, content: SYSTEM_PROMPT },
+    ...messages.map(({ role, content }) => ({ role, content })),
+  ];
 
   let openrouterResponse: Response;
   try {
@@ -138,7 +166,7 @@ export async function action({ request }: ActionFunctionArgs) {
       },
       body: JSON.stringify({
         model: apiModel,
-        messages: messages.map(({ role, content }) => ({ role, content })),
+        messages: apiMessages,
       }),
     });
   } catch {
@@ -152,7 +180,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!openrouterResponse.ok) {
     console.error('OpenRouter error:', openrouterResponse.status);
     return Response.json(
-      { error: 'El servicio de IA devolvió un error.' },
+      { error: 'El servicio de IA devolvio un error.' },
       { status: 502, headers }
     );
   }
@@ -160,6 +188,12 @@ export async function action({ request }: ActionFunctionArgs) {
   const data = await openrouterResponse.json();
   const assistantContent: string =
     data.choices?.[0]?.message?.content || 'No se pudo generar una respuesta.';
+
+  // Parse generated files from the response
+  const parsedFiles = parseGeneratedFiles(assistantContent);
+  const displayContent = parsedFiles.length > 0
+    ? stripFileBlocks(assistantContent)
+    : assistantContent;
 
   const actualInputTokens: number = data.usage?.prompt_tokens || estimatedInputTokens;
   const actualOutputTokens: number =
@@ -186,16 +220,53 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  // Build the assistant message
+  // Save parsed files to project_files (upsert by project_id + path)
+  let savedFilesCount = 0;
+  if (parsedFiles.length > 0) {
+    for (const file of parsedFiles) {
+      const { data: existing } = await supabase
+        .from('project_files')
+        .select('id, version')
+        .eq('project_id', projectId)
+        .eq('path', file.path)
+        .maybeSingle();
+
+      if (existing) {
+        const { error: updateErr } = await supabase
+          .from('project_files')
+          .update({
+            content: file.content,
+            language: file.language,
+            version: (existing.version || 1) + 1,
+          })
+          .eq('id', existing.id);
+
+        if (!updateErr) savedFilesCount++;
+      } else {
+        const { error: insertErr } = await supabase
+          .from('project_files')
+          .insert({
+            project_id: projectId,
+            path: file.path,
+            content: file.content,
+            language: file.language,
+          });
+
+        if (!insertErr) savedFilesCount++;
+      }
+    }
+  }
+
+  // Build the assistant message (store the display content, not the raw file blocks)
   const assistantMessage: ChatMessage = {
     role: 'assistant',
-    content: assistantContent,
+    content: displayContent,
     timestamp: new Date().toISOString(),
   };
 
   const finalMessages = [...messages, assistantMessage];
 
-  // Update chat in Supabase
+  // Update project in Supabase
   const updateData: Record<string, unknown> = {
     messages: finalMessages,
     updated_at: new Date().toISOString(),
@@ -207,12 +278,12 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const { error: updateError } = await supabase
-    .from('chats')
+    .from('projects')
     .update(updateData)
-    .eq('id', chatId);
+    .eq('id', projectId);
 
   if (updateError) {
-    console.error('Chat update failed:', updateError);
+    console.error('Project update failed:', updateError);
   }
 
   return Response.json(
@@ -221,6 +292,7 @@ export async function action({ request }: ActionFunctionArgs) {
       tokenBalance: newBalance,
       tokensUsed: actualTotalTokens,
       model: apiModel,
+      filesGenerated: savedFilesCount,
     },
     { headers }
   );
