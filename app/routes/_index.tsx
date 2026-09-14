@@ -9,10 +9,7 @@ import { createProject } from '~/lib/database';
 
 export const meta: MetaFunction = () => [
   { title: `${APP_NAME} — Build with AI` },
-  {
-    name: 'description',
-    content: 'Create complete web apps by chatting with AI.',
-  },
+  { name: 'description', content: 'Create complete web apps by chatting with AI.' },
 ];
 
 interface AuthenticatedHomeData {
@@ -31,13 +28,9 @@ type HomeData = AuthenticatedHomeData | PublicHomeData;
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const { supabase, headers } = createSupabaseServerClient(request);
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const { data: { user } } = await supabase.auth.getUser();
 
-  if (!user) {
-    return Response.json<PublicHomeData>({ authenticated: false }, { headers });
-  }
+  if (!user) return Response.json<PublicHomeData>({ authenticated: false }, { headers });
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
@@ -45,19 +38,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
     .eq('id', user.id)
     .maybeSingle();
 
-  if (profileError || !profile) {
-    return Response.json<PublicHomeData>({ authenticated: false }, { headers });
-  }
+  if (profileError || !profile) return Response.json<PublicHomeData>({ authenticated: false }, { headers });
 
   const { data: models } = await supabase
     .from('ai_models')
     .select('*')
     .eq('is_active', true)
     .order('sort_order', { ascending: true });
-
-  const preferredModel = (models || []).find(
-    (model: AIModel) => model.id === profile.preferred_model_id
-  );
+  const preferredModel = (models || []).find((model: AIModel) => model.id === profile.preferred_model_id);
   const defaultModelName = preferredModel?.name || (models || [])[0]?.name || 'DeepSeek V4';
 
   const { data: projects } = await supabase
@@ -75,184 +63,111 @@ export async function loader({ request }: LoaderFunctionArgs) {
       defaultModelName,
       recentProjects: (projects || []) as Project[],
     },
-    { headers }
+    { headers },
   );
 }
 
 function BoltMark() {
   return (
-    <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white text-[#0757d9] shadow-lg shadow-black/20">
-      <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M13 2L4 14h7l-1 8 10-13h-7l0-7z" />
-      </svg>
-    </div>
+    <svg className="h-5 w-5" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+      <path d="M18.1 2.6 6.5 17.1h8.2l-1.5 12.3 12.3-16.8h-8.2l.8-10Z" fill="currentColor" />
+    </svg>
   );
 }
 
+function ChevronIcon() {
+  return <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="m4 6 4 4 4-4" strokeLinecap="round" strokeLinejoin="round" /></svg>;
+}
+
 function ArrowIcon() {
-  return (
-    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14m-6-6l6 6-6 6" />
-    </svg>
-  );
+  return <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14m-6-6 6 6-6 6" /></svg>;
+}
+
+function GlobeIcon() {
+  return <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><circle cx="12" cy="12" r="9" /><path strokeLinecap="round" d="M3 12h18M12 3c2.2 2.4 3.3 5.4 3.3 9s-1.1 6.6-3.3 9c-2.2-2.4-3.3-5.4-3.3-9S9.8 5.4 12 3Z" /></svg>;
+}
+
+function SlidesIcon() {
+  return <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><rect x="4" y="5" width="16" height="12" rx="1.5" /><path strokeLinecap="round" d="M8 20h8M12 17v3M8 9h8M8 12h5" /></svg>;
+}
+
+function AppIcon() {
+  return <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><rect x="6" y="3.5" width="12" height="17" rx="2" /><path strokeLinecap="round" d="M10 6h4M11 17.5h2" /></svg>;
+}
+
+function FlaskIcon() {
+  return <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 3h6M10 3v6l-5.2 8.7A2.2 2.2 0 0 0 6.7 21h10.6a2.2 2.2 0 0 0 1.9-3.3L14 9V3M8 15h8" /></svg>;
+}
+
+function GitHubIcon() {
+  return <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="currentColor"><path d="M12 .7a11.3 11.3 0 0 0-3.6 22c.6.1.8-.3.8-.6v-2.2c-3.1.7-3.8-1.3-3.8-1.3-.5-1.3-1.2-1.7-1.2-1.7-1-.7.1-.7.1-.7 1.1.1 1.7 1.1 1.7 1.1 1 .1.1.7.9 1.1.9 1.1.8 2.1.6 2.6.4.1-.7.4-1.2.7-1.5-2.5-.3-5.1-1.3-5.1-5.6 0-1.2.4-2.2 1.1-3-.1-.3-.5-1.4.1-2.9 0 0 .9-.3 3.1 1.1a10.7 10.7 0 0 1 5.6 0c2.1-1.4 3-1.1 3-1.1.6 1.5.2 2.6.1 2.9.7.8 1.1 1.8 1.1 3 0 4.3-2.6 5.3-5.1 5.6.4.3.7 1 .7 1.9v2.8c0 .3.2.7.8.6A11.3 11.3 0 0 0 12 .7Z" /></svg>;
 }
 
 function PublicLanding() {
   const [prompt, setPrompt] = useState('');
   const [activeStarter, setActiveStarter] = useState('Website');
-
   const starters = [
-    { label: 'Website', icon: 'globe' },
-    { label: 'Dashboard', icon: 'chart' },
-    { label: 'SaaS app', icon: 'layers' },
-    { label: 'Prototype', icon: 'flask' },
+    { label: 'Website', icon: <GlobeIcon /> },
+    { label: 'Slides', icon: <SlidesIcon />, badge: 'New' },
+    { label: 'App', icon: <AppIcon /> },
+    { label: 'Prototype', icon: <FlaskIcon /> },
   ];
 
   return (
-    <div className="min-h-screen overflow-hidden bg-[#090d18] text-white">
-      <aside className="fixed inset-y-0 left-0 z-20 hidden w-48 border-r border-white/10 bg-[#0b0d13]/95 px-3 py-4 lg:block">
-        <div className="flex items-center gap-2 px-2">
-          <BoltMark />
-          <span className="text-sm font-bold tracking-tight">{APP_NAME}</span>
-        </div>
-        <div className="mt-6 flex items-center gap-2 rounded-lg border border-white/10 bg-white/[0.05] px-3 py-2 text-xs text-white/45">
-          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="7" /><path strokeLinecap="round" strokeLinejoin="round" d="m20 20-4-4" /></svg>
-          Search
-          <span className="ml-auto rounded border border-white/10 px-1 text-[9px]">⌘ K</span>
-        </div>
-        <nav className="mt-5 space-y-1 text-xs">
-          <div className="rounded-lg bg-white/10 px-3 py-2 font-medium text-white">Home</div>
-          <Link to="/auth/register" className="block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white">Projects</Link>
-          <Link to="/auth/register" className="block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white">Favorites</Link>
-          <Link to="/auth/register" className="block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white">Recently viewed</Link>
-        </nav>
-        <div className="mt-7 border-t border-white/10 pt-5 text-xs">
-          <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-wider text-white/30">Resources</p>
-          <a href="#como-funciona" className="block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white">Help center</a>
-          <a href="#caracteristicas" className="block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white">What's new</a>
-          <a href="#precios" className="block rounded-lg px-3 py-2 text-white/55 transition-colors hover:bg-white/10 hover:text-white">Status</a>
-        </div>
-        <div className="absolute bottom-4 left-3 right-3 rounded-xl border border-white/10 bg-gradient-to-br from-[#15284e] to-[#10131c] p-3">
-          <p className="text-xs font-semibold text-white">Start for free</p>
-          <p className="mt-1 text-[10px] leading-4 text-white/45">Build your first app with AI.</p>
-          <Link to="/auth/register" className="mt-3 flex items-center justify-center rounded-lg bg-white py-2 text-[10px] font-semibold text-[#0757d9]">Create account</Link>
-        </div>
-      </aside>
-      <div className="landing-grid pointer-events-none absolute inset-0 opacity-40" />
-      <div className="landing-orb landing-orb-one pointer-events-none absolute -top-48 left-[12%] h-[34rem] w-[34rem] rounded-full bg-[#0575ff]/30 blur-[110px]" />
-      <div className="landing-orb landing-orb-two pointer-events-none absolute -top-32 right-[7%] h-[27rem] w-[27rem] rounded-full bg-[#52d5ff]/20 blur-[100px]" />
-      <div className="pointer-events-none absolute inset-x-0 top-0 h-[54rem] bg-[radial-gradient(ellipse_at_50%_18%,rgba(11,128,255,0.62),transparent_58%)]" />
+    <div className="public-landing min-h-screen overflow-hidden text-white">
+      <div className="public-landing__glow public-landing__glow--left" />
+      <div className="public-landing__glow public-landing__glow--right" />
+      <div className="public-landing__grid" />
 
-      <header className="relative z-10 mx-auto flex w-full max-w-7xl items-center justify-between px-5 py-5 sm:px-8 lg:pl-56 lg:pr-10">
-        <Link to="/" className="flex items-center gap-2.5" aria-label={`${APP_NAME} home`}>
-          <BoltMark />
-          <span className="text-lg font-bold tracking-tight">{APP_NAME}</span>
+      <header className="relative z-10 mx-auto flex h-[68px] w-full max-w-[1160px] items-center justify-between px-5 sm:px-8">
+        <Link to="/" className="flex items-center gap-1.5 text-white" aria-label={`${APP_NAME} home`}>
+          <span className="flex h-7 w-7 items-center justify-center rounded-md bg-white text-[#111217]"><BoltMark /></span>
+          <span className="text-[15px] font-bold tracking-[-0.05em]">{APP_NAME}<sup className="ml-0.5 text-[7px] font-semibold tracking-normal">.new</sup></span>
         </Link>
-
-        <nav className="hidden items-center gap-8 text-sm text-white/70 md:flex">
-          <a href="#como-funciona" className="transition-colors hover:text-white">How it works</a>
-          <a href="#caracteristicas" className="transition-colors hover:text-white">Features</a>
-          <a href="#precios" className="transition-colors hover:text-white">Pricing</a>
+        <nav className="hidden items-center gap-7 text-[11px] font-medium text-white/65 md:flex">
+          <a href="#solutions" className="flex items-center gap-1 transition-colors hover:text-white">Solutions <ChevronIcon /></a>
+          <a href="#resources" className="flex items-center gap-1 transition-colors hover:text-white">Resources <ChevronIcon /></a>
+          <a href="#careers" className="transition-colors hover:text-white">Careers</a>
+          <a href="#pricing" className="transition-colors hover:text-white">Pricing</a>
         </nav>
-
-        <div className="flex items-center gap-2">
-          <Link to="/auth/login" className="rounded-lg px-3 py-2 text-sm font-medium text-white/80 transition-colors hover:bg-white/10 hover:text-white">
-            Log in
-          </Link>
-          <Link to="/auth/register" className="hidden rounded-lg bg-white px-4 py-2 text-sm font-semibold text-[#0757d9] shadow-lg shadow-blue-950/20 transition-transform hover:-translate-y-0.5 sm:inline-flex">
-            Get started free
-          </Link>
+        <div className="flex items-center gap-3">
+          <Link to="/auth/login" className="text-[11px] font-medium text-white/70 transition-colors hover:text-white">Sign in</Link>
+          <Link to="/auth/register" className="rounded-[3px] bg-[#1688ee] px-3.5 py-2 text-[11px] font-semibold text-white shadow-[0_0_18px_rgba(22,136,238,0.25)] transition-all hover:bg-[#36a0ff] hover:shadow-[0_0_24px_rgba(22,136,238,0.4)]">Get Started</Link>
         </div>
       </header>
 
-      <main className="relative z-10">
-        <section className="mx-auto flex min-h-[calc(100vh-80px)] w-full max-w-5xl flex-col items-center px-5 pb-20 pt-24 text-center sm:px-8 sm:pt-32 lg:pl-56 lg:pt-36">
-          <div className="mb-7 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.08] px-3.5 py-1.5 text-xs font-medium text-white/80 backdrop-blur-md">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[#67d8ff]" />
-            Your new development companion
-          </div>
+      <main className="relative z-10 flex min-h-[calc(100vh-68px)] flex-col items-center px-5 pt-[24vh] text-center sm:pt-[26vh]">
+        <h1 className="text-[30px] font-semibold leading-none tracking-[-0.045em] text-white sm:text-[34px]">What will you build today?</h1>
+        <p className="mt-3 text-[12px] text-white/80 sm:text-[13px]">Create stunning apps &amp; websites by chatting with AI.</p>
 
-          <h1 className="max-w-4xl text-5xl font-semibold leading-[1.02] tracking-[-0.055em] text-white sm:text-6xl lg:text-8xl">
-            What are you going to
-            <span className="block bg-gradient-to-r from-white via-[#b9eaff] to-[#54aaff] bg-clip-text text-transparent">create today?</span>
-          </h1>
-          <p className="mt-6 max-w-xl text-base leading-7 text-white/65 sm:text-lg">
-            Create amazing apps and websites by chatting with AI. Describe your idea and watch it come to life.
-          </p>
-
-          <form
-            action="/auth/register"
-            method="get"
-            className="mt-10 w-full max-w-2xl rounded-2xl border border-white/15 bg-[#101722]/90 p-3 text-left shadow-2xl shadow-[#001b55]/50 backdrop-blur-xl transition-all focus-within:border-[#69c9ff]/60 focus-within:shadow-[#087aff]/25"
-          >
-            <textarea
-              name="prompt"
-              value={prompt}
-              onChange={(event) => setPrompt(event.target.value)}
-              rows={2}
-              placeholder="Tell me what you want to build..."
-              className="w-full resize-none bg-transparent px-3 py-2 text-sm leading-6 text-white outline-none placeholder:text-white/35"
-            />
-            <div className="mt-2 flex flex-wrap items-center justify-between gap-3 border-t border-white/10 px-2 pt-3">
-              <div className="flex items-center gap-1.5">
-                <button type="button" className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 text-white/60 transition-colors hover:bg-white/10 hover:text-white" aria-label="Add context">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 5v14m-7-7h14" /></svg>
-                </button>
-                <span className="hidden text-xs text-white/40 sm:block">Start by describing an idea</span>
-              </div>
-              <button type="submit" className="group flex items-center gap-2 rounded-lg bg-[#1687ff] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-blue-950/40 transition-all hover:-translate-y-0.5 hover:bg-[#3298ff]">
-                Build now
-                <ArrowIcon />
-              </button>
+        <form action="/auth/register" method="get" className="mt-5 w-full max-w-[380px] rounded-[15px] border border-white/[0.08] bg-[#1b1b1d] p-2.5 text-left shadow-[0_18px_55px_rgba(0,0,0,0.35)] transition-all focus-within:border-white/20 focus-within:shadow-[0_18px_65px_rgba(0,100,255,0.2)] sm:max-w-[380px]">
+          <textarea name="prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={2} placeholder="Let's build a" className="h-[35px] w-full resize-none bg-transparent px-1.5 py-0.5 text-[11px] leading-5 text-white outline-none placeholder:text-white/35" />
+          <div className="mt-2 flex items-center justify-between">
+            <button type="button" aria-label="Add context" className="flex h-6 w-6 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/10 hover:text-white"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}><path strokeLinecap="round" d="M12 5v14M5 12h14" /></svg></button>
+            <div className="flex items-center gap-2.5">
+              <span className="hidden items-center gap-1 text-[10px] text-white/45 sm:flex"><svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18m0-18 4 4m-4-4-4 4M5 9h14M5 15h14" /></svg>Plan</span>
+              <button type="submit" className="group flex items-center gap-1.5 rounded-full bg-[#246b97] px-3 py-1.5 text-[10px] font-semibold text-white transition-all hover:bg-[#2f8bc2]">Build now <ArrowIcon /></button>
             </div>
-          </form>
-
-          <div className="mt-7 flex flex-wrap justify-center gap-2.5">
-            {starters.map((starter) => (
-              <button
-                key={starter.label}
-                type="button"
-                onClick={() => setActiveStarter(starter.label)}
-                className={`flex items-center gap-2 rounded-xl border px-3.5 py-2 text-xs transition-all ${activeStarter === starter.label ? 'border-white/25 bg-white/15 text-white' : 'border-white/10 bg-white/[0.04] text-white/55 hover:border-white/20 hover:bg-white/10 hover:text-white'}`}
-              >
-                <span className="text-sm">{starter.icon === 'globe' ? '◉' : starter.icon === 'chart' ? '◫' : starter.icon === 'layers' ? '▣' : '◇'}</span>
-                {starter.label}
-              </button>
-            ))}
           </div>
+        </form>
 
-          <div className="mt-12 flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-xs text-white/45">
-            <span>or start from</span>
-            <Link to="/auth/register" className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 transition-colors hover:bg-white/12 hover:text-white">
-              <span className="font-semibold text-white/70">GitHub</span>
-              <ArrowIcon />
-            </Link>
-            <Link to="/auth/register" className="inline-flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.06] px-3 py-1.5 transition-colors hover:bg-white/12 hover:text-white">
-              <span className="font-semibold text-white/70">A template</span>
-              <ArrowIcon />
-            </Link>
-          </div>
+        <div className="mt-6 flex items-start justify-center gap-2 sm:gap-2.5">
+          {starters.map((starter) => (
+            <button key={starter.label} type="button" onClick={() => setActiveStarter(starter.label)} className={`relative flex w-[54px] flex-col items-center gap-1.5 rounded-[7px] px-1.5 py-2 text-[9px] transition-all sm:w-[58px] ${activeStarter === starter.label ? 'bg-[#075aa5] text-white shadow-[0_5px_18px_rgba(0,99,190,0.22)]' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}>
+              {starter.badge && <span className="absolute -right-1 -top-2 rounded bg-[#1594f5] px-1 py-0.5 text-[7px] font-semibold text-white">{starter.badge}</span>}
+              <span className="text-white/90">{starter.icon}</span>
+              {starter.label}
+            </button>
+          ))}
+        </div>
 
-          <div className="mt-24 grid w-full max-w-4xl grid-cols-1 gap-4 text-left sm:grid-cols-3" id="caracteristicas">
-            {[
-              { title: 'From idea to product', body: 'Describe what you imagine and get an app ready to explore.', icon: '✦' },
-              { title: 'Edit freely', body: 'Open each file, change the code, and see results instantly.', icon: '⌁' },
-              { title: 'Publish without friction', body: 'Connect GitHub, save your work, and share your projects.', icon: '↗' },
-            ].map((feature) => (
-              <div key={feature.title} className="rounded-2xl border border-white/10 bg-white/[0.055] p-5 backdrop-blur-sm transition-colors hover:border-white/20 hover:bg-white/[0.09]">
-                <span className="text-xl text-[#68cbff]">{feature.icon}</span>
-                <h2 className="mt-4 text-sm font-semibold text-white">{feature.title}</h2>
-                <p className="mt-2 text-sm leading-6 text-white/50">{feature.body}</p>
-              </div>
-            ))}
-          </div>
-        </section>
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-1.5 text-[10px] text-white/60">
+          <span className="mr-1">or start from</span>
+          <Link to="/auth/register" className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><span className="font-semibold">Figma</span> <ArrowIcon /></Link>
+          <Link to="/auth/register" className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><GitHubIcon /> <span className="font-semibold">GitHub</span> <ArrowIcon /></Link>
+          <Link to="/auth/register" className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><span className="font-semibold">Team template</span> <ArrowIcon /></Link>
+        </div>
       </main>
-
-      <footer className="relative z-10 mx-auto flex max-w-7xl items-center justify-between border-t border-white/10 px-5 py-6 text-xs text-white/35 sm:px-8 lg:pl-56 lg:pr-10">
-        <span>© 2026 {APP_NAME}</span>
-        <span>Build something extraordinary.</span>
-      </footer>
     </div>
   );
 }
@@ -267,19 +182,12 @@ function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
     if (isCreating) return;
     setIsCreating(true);
     const project = await createProject(data.user.id);
-    if (project) {
-      const dest = prompt
-        ? `/project/${project.id}?prompt=${encodeURIComponent(prompt)}`
-        : `/project/${project.id}`;
-      navigate(dest);
-    }
+    if (project) navigate(prompt ? `/project/${project.id}?prompt=${encodeURIComponent(prompt)}` : `/project/${project.id}`);
     setIsCreating(false);
   }
 
   useEffect(() => {
-    if (initialPrompt) {
-      handleNewProject(initialPrompt);
-    }
+    if (initialPrompt) handleNewProject(initialPrompt);
   }, []);
 
   return (
@@ -288,22 +196,17 @@ function AuthenticatedHome({ data }: { data: AuthenticatedHomeData }) {
       <main className="flex min-w-0 flex-1 flex-col overflow-y-auto">
         <div className="mx-auto w-full max-w-4xl px-6 py-12">
           <div className="mb-12 text-center">
-            <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-[#9E7FFF]/10 ring-1 ring-[#9E7FFF]/30">
-              <svg className="h-10 w-10 text-[#9E7FFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-            </div>
-            <h1 className="mb-4 text-4xl font-bold tracking-tight text-white sm:text-5xl">Coderion</h1>
+            <div className="mb-6 inline-flex h-20 w-20 items-center justify-center rounded-3xl bg-[#1688ee]/10 ring-1 ring-[#1688ee]/30"><BoltMark /></div>
+            <h1 className="mb-4 text-4xl font-bold tracking-tight text-white sm:text-5xl">{APP_NAME}</h1>
             <p className="mb-8 text-lg text-[#A3A3A3]">Describe a web project and the AI generates all the files for you.</p>
-            <button onClick={() => handleNewProject()} disabled={isCreating} className="inline-flex items-center gap-2 rounded-xl bg-[#9E7FFF] px-6 py-3 font-semibold text-white transition-all hover:bg-[#8B6EE6] disabled:opacity-50">
-              {isCreating ? 'Creating...' : 'Create new project'}
-              {!isCreating && <ArrowIcon />}
-            </button>
+            <button onClick={() => handleNewProject()} disabled={isCreating} className="inline-flex items-center gap-2 rounded-xl bg-[#1688ee] px-6 py-3 font-semibold text-white transition-all hover:bg-[#3298ff] disabled:opacity-50">{isCreating ? 'Creating...' : 'Create new project'}{!isCreating && <ArrowIcon />}</button>
           </div>
           <div className="mb-12 grid grid-cols-1 gap-4 sm:grid-cols-3">
             <div className="rounded-2xl bg-[#262626] p-5 ring-1 ring-[#2F2F2F]"><h2 className="mb-1 text-sm font-medium text-[#A3A3A3]">Available tokens</h2><p className="text-2xl font-bold text-white">{data.profile.token_balance.toLocaleString()}</p></div>
             <div className="rounded-2xl bg-[#262626] p-5 ring-1 ring-[#2F2F2F]"><h2 className="mb-1 text-sm font-medium text-[#A3A3A3]">Model</h2><p className="text-2xl font-bold text-white">{data.defaultModelName}</p></div>
             <div className="rounded-2xl bg-[#262626] p-5 ring-1 ring-[#2F2F2F]"><h2 className="mb-1 text-sm font-medium text-[#A3A3A3]">Version</h2><p className="text-2xl font-bold text-white">v{APP_VERSION}</p></div>
           </div>
-          {data.recentProjects.length > 0 && <div><h3 className="mb-4 text-sm font-medium text-[#A3A3A3]">Recent projects</h3><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{data.recentProjects.map((project) => <button key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="group rounded-2xl bg-[#262626] p-4 text-left ring-1 ring-[#2F2F2F] transition-all hover:ring-[#9E7FFF]/30"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#9E7FFF]/10"><svg className="h-5 w-5 text-[#9E7FFF]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white transition-colors group-hover:text-[#9E7FFF]">{project.title}</p><p className="text-xs text-[#A3A3A3]">{new Date(project.updated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</p></div></div></button>)}</div></div>}
+          {data.recentProjects.length > 0 && <div><h3 className="mb-4 text-sm font-medium text-[#A3A3A3]">Recent projects</h3><div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{data.recentProjects.map((project) => <button key={project.id} onClick={() => navigate(`/project/${project.id}`)} className="group rounded-2xl bg-[#262626] p-4 text-left ring-1 ring-[#2F2F2F] transition-all hover:ring-[#1688ee]/30"><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#1688ee]/10"><svg className="h-5 w-5 text-[#1688ee]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M3 7v10a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-6l-2-2H5a2 2 0 0 0-2 2Z" /></svg></div><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-white transition-colors group-hover:text-[#1688ee]">{project.title}</p><p className="text-xs text-[#A3A3A3]">{new Date(project.updated_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}</p></div></div></button>)}</div></div>}
         </div>
       </main>
     </div>
