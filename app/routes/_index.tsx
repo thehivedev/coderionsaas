@@ -175,9 +175,7 @@ function PublicLanding() {
 
         <div className="mt-8 flex flex-wrap items-center justify-center gap-1.5 text-[10px] text-white/60">
           <span className="mr-1">or start from</span>
-          <Link to="/auth/register" className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><span className="font-semibold">Figma</span> <ArrowIcon /></Link>
           <Link to="/auth/register" className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><GitHubIcon /> <span className="font-semibold">GitHub</span> <ArrowIcon /></Link>
-          <Link to="/auth/register" className="inline-flex items-center gap-1 rounded-full bg-white/[0.09] px-2.5 py-1.5 transition-colors hover:bg-white/15 hover:text-white"><span className="font-semibold">Team template</span> <ArrowIcon /></Link>
         </div>
       </main>
 
