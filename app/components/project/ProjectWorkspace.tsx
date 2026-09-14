@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { AIModel, ChatMessage, ProjectFile, Profile } from '~/lib/types';
+import type { AIModel, ChatMessage, ProjectFile, Profile, ProjectType } from '~/lib/types';
 import { getProjectFiles, deleteProjectFile } from '~/lib/database';
 import FileTree from './FileTree';
 import CodeEditor from './CodeEditor';
@@ -10,6 +10,7 @@ import MenuClient from '~/components/sidebar/Menu';
 interface ProjectWorkspaceProps {
   projectId: string;
   projectTitle: string;
+  projectType: ProjectType | null;
   initialMessages: ChatMessage[];
   initialFiles: ProjectFile[];
   models: AIModel[];
@@ -32,7 +33,7 @@ function Icon({ name, className = 'h-4 w-4' }: { name: 'send' | 'code' | 'eye' |
   return <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}>{paths[name]}</svg>;
 }
 
-export default function ProjectWorkspace({ projectId, projectTitle, initialMessages, initialFiles, models, initialPrompt, user, profile }: ProjectWorkspaceProps) {
+export default function ProjectWorkspace({ projectId, projectTitle, projectType, initialMessages, initialFiles, models, initialPrompt, user, profile }: ProjectWorkspaceProps) {
   const [messages, setMessages] = useState<ChatMessage[]>(initialMessages || []);
   const [files, setFiles] = useState<ProjectFile[]>(initialFiles || []);
   const [input, setInput] = useState('');
@@ -274,7 +275,7 @@ export default function ProjectWorkspace({ projectId, projectTitle, initialMessa
             {editingFile ? (
               <CodeEditor file={editingFile} onContentChange={handleContentChange} onClose={handleCloseEditor} />
             ) : (
-              <LivePreview files={files} />
+              <LivePreview files={files} projectType={projectType} />
             )}
           </main>
         </div>

@@ -41,11 +41,14 @@ export interface AIModel {
   updated_at: string;
 }
 
+export type ProjectType = 'react-web' | 'expo';
+
 export interface Project {
   id: string;
   user_id: string;
   title: string;
   model_id: string | null;
+  project_type: ProjectType | null;
   status: 'active' | 'archived';
   messages: ChatMessage[];
   created_at: string;

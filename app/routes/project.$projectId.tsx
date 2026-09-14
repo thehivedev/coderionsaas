@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
 import { useLoaderData, useSearchParams } from '@remix-run/react';
 import { createSupabaseServerClient } from '~/lib/supabaseServer';
 import { APP_NAME } from '~/lib/constants';
-import type { AIModel, ProjectFile } from '~/lib/types';
+import type { AIModel, ProjectFile, ProjectType } from '~/lib/types';
 import MenuClient from '~/components/sidebar/Menu';
 import ProjectWorkspace from '~/components/project/ProjectWorkspace';
 
@@ -95,6 +95,7 @@ export default function ProjectRoute() {
       title: string;
       messages: { role: string; content: string; timestamp?: string }[];
       model_id: string | null;
+      project_type: ProjectType | null;
       status: string;
     };
     files: ProjectFile[];
@@ -105,6 +106,7 @@ export default function ProjectRoute() {
     <ProjectWorkspace
       projectId={project.id}
       projectTitle={project.title}
+      projectType={project.project_type}
       initialMessages={project.messages}
       initialFiles={files}
       models={models}
