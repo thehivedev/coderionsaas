@@ -3,8 +3,8 @@ import { useLoaderData, useSearchParams } from '@remix-run/react';
 import { createSupabaseServerClient } from '~/lib/supabaseServer';
 import { APP_NAME } from '~/lib/constants';
 import type { AIModel, ProjectFile } from '~/lib/types';
-import MenuClient from '~/components/sidebar/Menu.client';
-import ProjectWorkspace from '~/components/project/ProjectWorkspace.client';
+import MenuClient from '~/components/sidebar/Menu';
+import ProjectWorkspace from '~/components/project/ProjectWorkspace';
 
 export const meta: MetaFunction = () => [
   { title: `${APP_NAME} - Project` },

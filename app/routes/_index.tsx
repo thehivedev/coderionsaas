@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 import { createSupabaseServerClient } from '~/lib/supabaseServer';
 import { APP_NAME, APP_VERSION } from '~/lib/constants';
 import type { AIModel, Project, Profile } from '~/lib/types';
-import MenuClient from '~/components/sidebar/Menu.client';
+import MenuClient from '~/components/sidebar/Menu';
 import { createProject } from '~/lib/database';
 
 export const meta: MetaFunction = () => [
