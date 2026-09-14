@@ -151,8 +151,8 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
 
       {/* Bottom: Account avatar icon only, dropdown opens upward */}
       <div className="mt-auto relative border-t border-[#27292E] p-2">
-        <button type="button" onClick={() => setShowProfile((c) => (c ? null : 'bottom'))} className="flex w-full items-center justify-start rounded-lg p-2 transition hover:bg-[#24272C]" aria-label="Open account">
-          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E47AC7] text-[11px] font-bold text-[#30152A]">{initials}</span>
+        <button type="button" onClick={() => setShowProfile((c) => (c ? null : 'bottom'))} className="group flex w-full items-center justify-start rounded-lg p-2 transition" aria-label="Open account">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E47AC7] text-[11px] font-bold text-[#30152A] transition group-hover:ring-2 group-hover:ring-[#E47AC7]/40">{initials}</span>
         </button>
         {accountMenu}
       </div>
