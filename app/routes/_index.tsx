@@ -106,6 +106,7 @@ function GitHubIcon() {
 function PublicLanding() {
   const [prompt, setPrompt] = useState('');
   const [activeStarter, setActiveStarter] = useState('Website');
+  const [selectedStarter, setSelectedStarter] = useState<string | null>(null);
   const [showSignup, setShowSignup] = useState(false);
   const starters = [
     { label: 'Website', icon: <GlobeIcon /> },
@@ -113,6 +114,7 @@ function PublicLanding() {
     { label: 'App', icon: <AppIcon /> },
     { label: 'Prototype', icon: <FlaskIcon /> },
   ];
+  const selectedStarterItem = starters.find((starter) => starter.label === selectedStarter);
 
   return (
     <div className="public-landing min-h-screen overflow-hidden text-white">
@@ -144,7 +146,14 @@ function PublicLanding() {
         <form onSubmit={(event) => { event.preventDefault(); setShowSignup(true); }} className="mt-5 w-full max-w-[380px] rounded-[15px] border border-white/[0.08] bg-[#1b1b1d] p-2.5 text-left shadow-[0_18px_55px_rgba(0,0,0,0.35)] transition-all focus-within:border-white/20 focus-within:shadow-[0_18px_65px_rgba(0,100,255,0.2)] sm:max-w-[380px]">
           <textarea name="prompt" value={prompt} onChange={(event) => setPrompt(event.target.value)} rows={2} placeholder="Let's build a" className="h-[35px] w-full resize-none bg-transparent px-1.5 py-0.5 text-[11px] leading-5 text-white outline-none placeholder:text-white/35" />
           <div className="mt-2 flex items-center justify-between">
-            <button type="button" aria-label="Add context" className="flex h-6 w-6 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/10 hover:text-white"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}><path strokeLinecap="round" d="M12 5v14M5 12h14" /></svg></button>
+            <div className="flex min-w-0 items-center gap-1.5">
+              <button type="button" aria-label="Add context" className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-white/45 transition-colors hover:bg-white/10 hover:text-white"><svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.7}><path strokeLinecap="round" d="M12 5v14M5 12h14" /></svg></button>
+              {selectedStarterItem && <span className="inline-flex max-w-[110px] items-center gap-1 rounded-full border border-[#2d75a5]/60 bg-[#123b59] px-1.5 py-1 text-[9px] font-medium text-[#9edbff]">
+                <span className="shrink-0 text-[#65c5ff]">{selectedStarterItem.icon}</span>
+                <span className="truncate">{selectedStarterItem.label}</span>
+                <button type="button" onClick={() => setSelectedStarter(null)} aria-label={`Remove ${selectedStarterItem.label} flag`} className="ml-0.5 text-[#86b9d6] transition-colors hover:text-white">×</button>
+              </span>}
+            </div>
             <div className="flex items-center gap-2.5">
               <span className="hidden items-center gap-1 text-[10px] text-white/45 sm:flex"><svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18m0-18 4 4m-4-4-4 4M5 9h14M5 15h14" /></svg>Plan</span>
               <button type="submit" className="group flex items-center gap-1.5 rounded-full bg-[#246b97] px-3 py-1.5 text-[10px] font-semibold text-white transition-all hover:bg-[#2f8bc2]">Build now <ArrowIcon /></button>
@@ -154,7 +163,7 @@ function PublicLanding() {
 
         <div className="mt-6 flex items-start justify-center gap-2 sm:gap-2.5">
           {starters.map((starter) => (
-            <button key={starter.label} type="button" onClick={() => setActiveStarter(starter.label)} className={`relative flex w-[54px] flex-col items-center gap-1.5 rounded-[7px] px-1.5 py-2 text-[9px] transition-all sm:w-[58px] ${activeStarter === starter.label ? 'bg-[#075aa5] text-white shadow-[0_5px_18px_rgba(0,99,190,0.22)]' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}>
+            <button key={starter.label} type="button" onClick={() => { setActiveStarter(starter.label); setSelectedStarter(starter.label); }} className={`relative flex w-[54px] flex-col items-center gap-1.5 rounded-[7px] px-1.5 py-2 text-[9px] transition-all sm:w-[58px] ${activeStarter === starter.label ? 'bg-[#075aa5] text-white shadow-[0_5px_18px_rgba(0,99,190,0.22)]' : 'text-white/75 hover:bg-white/10 hover:text-white'}`}>
               {starter.badge && <span className="absolute -right-1 -top-2 rounded bg-[#1594f5] px-1 py-0.5 text-[7px] font-semibold text-white">{starter.badge}</span>}
               <span className="text-white/90">{starter.icon}</span>
               {starter.label}
