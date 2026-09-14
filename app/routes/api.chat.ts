@@ -1,5 +1,5 @@
 import type { ActionFunctionArgs } from '@remix-run/node';
-import { createSupabaseServerClient } from '~/lib/supabaseServer';
+import { createSupabaseServerClient, createSupabaseServiceClient } from '~/lib/supabaseServer';
 import type { ChatMessage } from '~/lib/types';
 
 const MODEL = 'deepseek/deepseek-v4-pro-0813';
@@ -141,8 +141,9 @@ export async function action({ request }: ActionFunctionArgs) {
     data.usage?.completion_tokens || estimatedOutputTokens;
   const actualTotalTokens = actualInputTokens + actualOutputTokens;
 
-  // Deduct tokens server-side via RPC
-  const { data: newBalance, error: deductError } = await supabase.rpc(
+  // Deduct tokens via service role client (deduct_tokens is service-role only)
+  const serviceClient = createSupabaseServiceClient();
+  const { data: newBalance, error: deductError } = await serviceClient.rpc(
     'deduct_tokens',
     {
       p_user_id: user.id,

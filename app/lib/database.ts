@@ -1,5 +1,5 @@
 import { supabase } from './supabaseClient';
-import type { Chat, ChatMessage, Profile } from './types';
+import type { Chat, Profile } from './types';
 
 export async function getProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -65,33 +65,6 @@ export async function createChat(userId: string): Promise<Chat | null> {
   return data as Chat | null;
 }
 
-export async function updateChatMessages(
-  chatId: string,
-  messages: ChatMessage[],
-  title?: string
-): Promise<boolean> {
-  const updateData: Record<string, unknown> = {
-    messages,
-    updated_at: new Date().toISOString(),
-  };
-
-  if (title) {
-    updateData.title = title;
-  }
-
-  const { error } = await supabase
-    .from('chats')
-    .update(updateData)
-    .eq('id', chatId);
-
-  if (error) {
-    console.error('Error updating chat:', error);
-    return false;
-  }
-
-  return true;
-}
-
 export async function deleteChat(chatId: string): Promise<boolean> {
   const { error } = await supabase
     .from('chats')
@@ -106,30 +79,4 @@ export async function deleteChat(chatId: string): Promise<boolean> {
   return true;
 }
 
-export async function deductTokens(userId: string, amount: number): Promise<number | null> {
-  const { data, error } = await supabase.rpc('deduct_tokens', {
-    p_user_id: userId,
-    p_amount: amount,
-  });
 
-  if (error) {
-    console.error('Error deducting tokens:', error);
-    return null;
-  }
-
-  return data as number;
-}
-
-export async function addTokens(userId: string, amount: number): Promise<number | null> {
-  const { data, error } = await supabase.rpc('add_tokens', {
-    p_user_id: userId,
-    p_amount: amount,
-  });
-
-  if (error) {
-    console.error('Error adding tokens:', error);
-    return null;
-  }
-
-  return data as number;
-}

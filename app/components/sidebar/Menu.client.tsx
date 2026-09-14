@@ -14,6 +14,7 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -47,6 +48,26 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
       if (location.pathname === `/chat/${chatId}`) {
         navigate('/');
       }
+    }
+  }
+
+  async function handleBuyTokens(pkg: 'basic' | 'pro' | 'enterprise') {
+    if (isRedirecting) return;
+    setIsRedirecting(true);
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ package: pkg }),
+      });
+      const data = await response.json();
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    } catch {
+      console.error('Checkout redirect failed');
+    } finally {
+      setIsRedirecting(false);
     }
   }
 
@@ -185,6 +206,14 @@ export default function MenuClient({ user, profile }: MenuClientProps) {
                 {profile.token_balance.toLocaleString()}
               </span>
             </div>
+
+            <button
+              onClick={() => handleBuyTokens('basic')}
+              disabled={isRedirecting}
+              className="w-full flex items-center justify-center gap-2 text-sm text-[#9E7FFF] hover:text-white transition-colors bg-[#9E7FFF]/10 border border-[#9E7FFF]/30 rounded-lg px-4 py-2.5 hover:bg-[#9E7FFF]/20 focus:outline-none focus:ring-2 focus:ring-[#9E7FFF]/40 disabled:opacity-50 mb-2"
+            >
+              {isRedirecting ? 'Redirigiendo...' : 'Comprar tokens'}
+            </button>
 
             <Form method="post" action="/auth/logout">
               <button

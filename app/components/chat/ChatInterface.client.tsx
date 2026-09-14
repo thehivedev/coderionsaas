@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { getChat, updateChatMessages } from '~/lib/database';
+import { getChat } from '~/lib/database';
 import type { Chat, ChatMessage, Profile } from '~/lib/types';
 
 interface ChatInterfaceProps {

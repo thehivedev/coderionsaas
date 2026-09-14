@@ -2,8 +2,6 @@ import { vitePlugin as remix } from "@remix-run/dev";
 import { defineConfig } from "vite";
 import tsconfigPaths from "vite-tsconfig-paths";
 
-declareRemixViteServer();
-
 export default defineConfig({
   plugins: [
     remix({
@@ -18,7 +16,3 @@ export default defineConfig({
     tsconfigPaths(),
   ],
 });
-
-function declareRemixViteServer() {
-  return undefined;
-}
