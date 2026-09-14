@@ -149,12 +149,10 @@ export default function MenuClient({ user, profile, variant = 'sidebar' }: MenuC
         <NavItem icon="release" label="Release notes" collapsed={isCollapsed} onClick={() => window.open('https://support.bolt.new', '_blank', 'noopener,noreferrer')} />
       </nav>
 
-      {/* Bottom: Account avatar with dropdown opening upward */}
+      {/* Bottom: Account avatar icon only, dropdown opens upward */}
       <div className="mt-auto relative border-t border-[#27292E] p-2">
-        <button type="button" onClick={() => setShowProfile((c) => (c ? null : 'bottom'))} className={`flex w-full items-center rounded-lg p-2 text-left transition hover:bg-[#24272C] ${isCollapsed ? 'justify-center' : 'gap-2.5'}`}>
-          <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#E47AC7] text-[11px] font-bold text-[#30152A]">{initials}</span>
-          {!isCollapsed && <span className="min-w-0 flex-1"><span className="block truncate text-xs font-medium text-white">{profile.full_name || user.email}</span><span className="block truncate text-[10px] text-[#858A94]">{user.email}</span></span>}
-          {!isCollapsed && <MenuIcon name="chevron" className="h-3.5 w-3.5 text-[#777C86]" />}
+        <button type="button" onClick={() => setShowProfile((c) => (c ? null : 'bottom'))} className="flex w-full items-center justify-center rounded-lg p-2 transition hover:bg-[#24272C]" aria-label="Open account">
+          <span className="flex h-7 w-7 items-center justify-center rounded-full bg-[#E47AC7] text-[11px] font-bold text-[#30152A]">{initials}</span>
         </button>
         {accountMenu}
       </div>
