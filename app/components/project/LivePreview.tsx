@@ -1,5 +1,6 @@
 import { useMemo, useState, useEffect } from 'react';
 import type { ProjectFile, ProjectType } from '~/lib/types';
+import { buildPreviewHtml } from '~/lib/preview-builder';
 
 interface LivePreviewProps {
   files: ProjectFile[];
@@ -7,10 +8,6 @@ interface LivePreviewProps {
 }
 
 type DeviceMode = 'mobile' | 'desktop';
-
-function findFile(files: ProjectFile[], path: string): ProjectFile | undefined {
-  return files.find((f) => f.path === path || f.path.endsWith('/' + path));
-}
 
 function detectProjectType(files: ProjectFile[]): ProjectType {
   const hasExpoConfig = files.some(
@@ -27,258 +24,6 @@ function detectProjectType(files: ProjectFile[]): ProjectType {
   return 'react-web';
 }
 
-function buildReactWebPreview(files: ProjectFile[]): string {
-  const htmlFile = findFile(files, 'index.html') || findFile(files, 'index.htm');
-  const cssFiles = files.filter((f) => f.language === 'css' || f.path.endsWith('.css'));
-  const jsFiles = files.filter(
-    (f) =>
-      f.language === 'js' ||
-      f.language === 'javascript' ||
-      f.path.endsWith('.js')
-  );
-  const tsxFiles = files.filter(
-    (f) =>
-      f.language === 'tsx' ||
-      f.language === 'jsx' ||
-      f.language === 'ts' ||
-      f.path.endsWith('.tsx') ||
-      f.path.endsWith('.jsx')
-  );
-
-  let html = htmlFile?.content || '<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n</head>\n<body>\n<div id="root"></div>\n</body>\n</html>';
-
-  const styleTags = cssFiles
-    .map((f) => `<style data-path="${f.path}">\n${f.content}\n</style>`)
-    .join('\n');
-  if (styleTags) {
-    html = html.replace('</head>', `${styleTags}\n</head>`);
-  }
-
-  const hasReactRoot = html.includes('id="root"') || html.includes("id='root'");
-  if (!hasReactRoot) {
-    html = html.replace('</body>', '<div id="root"></div>\n</body>');
-  }
-
-  const babelScript = `
-<script type="module">
-import { transform } from "https://esm.sh/@babel/standalone@7.24.7";
-window.babelTransform = (code, filename) => {
-  const result = transform(code, {
-    filename: filename || 'file.tsx',
-    presets: [
-      ['typescript', { allExtensions: true, isTSX: true }],
-      ['react', { runtime: 'automatic' }]
-    ],
-  });
-  return result.code;
-};
-</script>`;
-
-  const reactPreamble = `
-<script type="module">
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "https://esm.sh/react@18.3.1";
-import { createRoot } from "https://esm.sh/react-dom@18.3.1/client";
-window.React = React;
-window.useState = useState;
-window.useEffect = useEffect;
-window.useRef = useRef;
-window.useCallback = useCallback;
-window.useMemo = useMemo;
-window.createRoot = createRoot;
-</script>`;
-
-  const fileModules = tsxFiles.map((f) => {
-    const safePath = f.path.replace(/[^a-zA-Z0-9_]/g, '_');
-    return `<script type="module" data-path="${f.path}">
-const raw = ${JSON.stringify(f.content)};
-const transformed = window.babelTransform(raw, "${f.path}");
-const blob = new Blob([transformed], { type: 'text/javascript' });
-const url = URL.createObjectURL(blob);
-window.__module_${safePath} = url;
-</script>`;
-  }).join('\n');
-
-  const entryFile = tsxFiles.find((f) =>
-    f.path === 'src/App.tsx' ||
-    f.path === 'src/App.jsx' ||
-    f.path === 'src/main.tsx' ||
-    f.path === 'src/main.jsx' ||
-    f.path === 'src/index.tsx' ||
-    f.path === 'src/index.jsx' ||
-    f.path === 'App.tsx' ||
-    f.path === 'App.jsx'
-  );
-
-  let entryScript = '';
-  if (entryFile) {
-    const safePath = entryFile.path.replace(/[^a-zA-Z0-9_/]/g, '_');
-    entryScript = `<script type="module">
-const mod = await import(window.__module_${safePath});
-const root = createRoot(document.getElementById('root'));
-const Component = mod.default || mod.App;
-root.render(Component ? React.createElement(Component) : null);
-</script>`;
-  }
-
-  const plainJsScripts = jsFiles
-    .filter((f) => !tsxFiles.includes(f))
-    .map((f) => `<script data-path="${f.path}">\n${f.content}\n</script>`)
-    .join('\n');
-
-  if (plainJsScripts) {
-    html = html.replace('</body>', `${plainJsScripts}\n</body>`);
-  }
-
-  html = html.replace('</head>', `${babelScript}\n${reactPreamble}\n${fileModules}\n${entryScript}\n</head>`);
-
-  return html;
-}
-
-function buildExpoPreview(files: ProjectFile[]): string {
-  const appFile = files.find(
-    (f) =>
-      f.path === 'App.tsx' ||
-      f.path === 'App.js' ||
-      f.path === 'app/App.tsx' ||
-      f.path === 'app/App.js' ||
-      f.path === 'src/App.tsx' ||
-      f.path === 'src/App.js'
-  );
-
-  const componentFiles = files.filter(
-    (f) =>
-      (f.language === 'tsx' || f.language === 'jsx' || f.path.endsWith('.tsx') || f.path.endsWith('.jsx')) &&
-      f.path !== 'node_modules/' &&
-      !f.path.startsWith('node_modules/')
-  );
-
-  const allRnFiles = appFile ? [appFile, ...componentFiles.filter((f) => f !== appFile)] : componentFiles;
-
-  const fileModules = allRnFiles.map((f) => {
-    const safePath = f.path.replace(/[^a-zA-Z0-9_]/g, '_');
-    return `<script type="module">
-const raw = ${JSON.stringify(f.content)};
-const transformed = window.babelTransform(raw, "${f.path}");
-const blob = new Blob([transformed], { type: 'text/javascript' });
-const url = URL.createObjectURL(blob);
-window.__module_${safePath} = url;
-</script>`;
-  }).join('\n');
-
-  const entryPath = appFile?.path || componentFiles[0]?.path;
-  const safeEntry = entryPath ? entryPath.replace(/[^a-zA-Z0-9_]/g, '_') : '';
-
-  return `<!DOCTYPE html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
-<style>
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { height: 100%; background: #fff; }
-  #root { height: 100%; }
-</style>
-<script type="module">
-import { transform } from "https://esm.sh/@babel/standalone@7.24.7";
-window.babelTransform = (code, filename) => {
-  const result = transform(code, {
-    filename: filename || 'file.tsx',
-    presets: [
-      ['typescript', { allExtensions: true, isTSX: true }],
-      ['react', { runtime: 'automatic' }]
-    ],
-  });
-  return result.code;
-};
-</script>
-<script type="module">
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "https://esm.sh/react@18.3.1";
-import { createRoot } from "https://esm.sh/react-dom@18.3.1/client";
-window.React = React;
-window.useState = useState;
-window.useEffect = useEffect;
-window.useRef = useRef;
-window.useCallback = useCallback;
-window.useMemo = useMemo;
-window.createRoot = createRoot;
-</script>
-<script type="module">
-import { View, Text, ScrollView, Image, Pressable, TouchableOpacity, TextInput, FlatList, StyleSheet, SafeAreaView, StatusBar, ActivityIndicator, Modal, Switch, Platform, Dimensions, KeyboardAvoidingView, TouchableWithoutFeedback, Alert, Linking, Animated, Easing, PanResponder } from "https://esm.sh/react-native-web@0.19.13?external=react,react-dom";
-window.View = View;
-window.Text = Text;
-window.ScrollView = ScrollView;
-window.Image = Image;
-window.Pressable = Pressable;
-window.TouchableOpacity = TouchableOpacity;
-window.TextInput = TextInput;
-window.FlatList = FlatList;
-window.StyleSheet = StyleSheet;
-window.SafeAreaView = SafeAreaView;
-window.StatusBar = StatusBar;
-window.ActivityIndicator = ActivityIndicator;
-window.Modal = Modal;
-window.Switch = Switch;
-window.Platform = Platform;
-window.Dimensions = Dimensions;
-window.KeyboardAvoidingView = KeyboardAvoidingView;
-window.TouchableWithoutFeedback = TouchableWithoutFeedback;
-window.Alert = Alert;
-window.Linking = Linking;
-window.Animated = Animated;
-window.Easing = Easing;
-window.PanResponder = PanResponder;
-</script>
-${fileModules}
-<script type="module">
-const root = createRoot(document.getElementById('root'));
-${safeEntry ? `
-try {
-  const mod = await import(window.__module_${safeEntry});
-  const Component = mod.default || mod.App;
-  root.render(Component ? React.createElement(Component) : React.createElement(Text, null, 'No default export found'));
-} catch(err) {
-  root.render(React.createElement('div', { style: { padding: 20, fontFamily: 'monospace', fontSize: 13, color: '#cc0000' } }, 'Error: ' + err.message));
-}
-` : `
-root.render(React.createElement('div', { style: { padding: 20, fontFamily: 'monospace', fontSize: 13, color: '#666' } }, 'No App.tsx found'));
-`}
-</script>
-</head>
-<body>
-<div id="root"></div>
-</body>
-</html>`;
-}
-
-function buildStaticHtmlPreview(files: ProjectFile[]): string {
-  const htmlFile = findFile(files, 'index.html') || findFile(files, 'index.htm');
-  const cssFiles = files.filter((f) => f.language === 'css' || f.path.endsWith('.css'));
-  const jsFiles = files.filter(
-    (f) =>
-      f.language === 'js' ||
-      f.language === 'javascript' ||
-      f.path.endsWith('.js')
-  );
-
-  let html = htmlFile?.content || '<!DOCTYPE html>\n<html>\n<head>\n<meta charset="utf-8">\n</head>\n<body>\n</body>\n</html>';
-
-  const styleTags = cssFiles
-    .map((f) => `<style data-path="${f.path}">\n${f.content}\n</style>`)
-    .join('\n');
-  if (styleTags) {
-    html = html.replace('</head>', `${styleTags}\n</head>`);
-  }
-
-  const scriptTags = jsFiles
-    .map((f) => `<script data-path="${f.path}">\n${f.content}\n</script>`)
-    .join('\n');
-  if (scriptTags) {
-    html = html.replace('</body>', `${scriptTags}\n</body>`);
-  }
-
-  return html;
-}
-
 export default function LivePreview({ files, projectType }: LivePreviewProps) {
   const [iframeKey, setIframeKey] = useState(0);
   const [autoRefresh, setAutoRefresh] = useState(true);
@@ -286,17 +31,9 @@ export default function LivePreview({ files, projectType }: LivePreviewProps) {
   const [deviceMode, setDeviceMode] = useState<DeviceMode>('desktop');
 
   const detectedType = useMemo(() => projectType || detectProjectType(files), [projectType, files]);
-
   const isExpo = detectedType === 'expo';
 
-  const previewHtml = useMemo(() => {
-    if (isExpo) return buildExpoPreview(files);
-    const hasTsx = files.some(
-      (f) => f.language === 'tsx' || f.language === 'jsx' || f.path.endsWith('.tsx') || f.path.endsWith('.jsx')
-    );
-    if (hasTsx) return buildReactWebPreview(files);
-    return buildStaticHtmlPreview(files);
-  }, [files, isExpo]);
+  const previewHtml = useMemo(() => buildPreviewHtml(files, isExpo), [files, isExpo]);
 
   useEffect(() => {
     if (autoRefresh) {
