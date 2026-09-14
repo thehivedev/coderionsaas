@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs, MetaFunction } from '@remix-run/node';
 import { useLoaderData } from '@remix-run/react';
 import { createSupabaseServerClient } from '~/lib/supabaseServer';
 import { APP_NAME, APP_VERSION } from '~/lib/constants';
+import type { AIModel } from '~/lib/types';
 import MenuClient from '~/components/sidebar/Menu.client';
 
 export const meta: MetaFunction = () => {
@@ -44,6 +45,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
     });
   }
 
+  const { data: models } = await supabase
+    .from('ai_models')
+    .select('*')
+    .eq('is_active', true)
+    .order('sort_order', { ascending: true });
+
+  const preferredModel = (models || []).find(
+    (m: AIModel) => m.id === profile.preferred_model_id
+  );
+  const defaultModelName = preferredModel?.name || (models || [])[0]?.name || 'DeepSeek V4';
+
   return Response.json(
     {
       user: {
@@ -51,13 +63,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
         email: user.email,
       },
       profile,
+      defaultModelName,
     },
     { headers }
   );
 }
 
 export default function IndexRoute() {
-  const { user, profile } = useLoaderData<{
+  const { user, profile, defaultModelName } = useLoaderData<{
     user: { id: string; email: string };
     profile: {
       id: string;
@@ -65,9 +78,11 @@ export default function IndexRoute() {
       full_name: string | null;
       avatar_url: string | null;
       token_balance: number;
+      preferred_model_id: string | null;
       created_at: string;
       updated_at: string;
     };
+    defaultModelName: string;
   }>();
 
   return (
@@ -93,7 +108,7 @@ export default function IndexRoute() {
             </div>
             <div className="bg-[#262626] rounded-2xl p-5 ring-1 ring-[#2F2F2F]">
               <h2 className="text-sm font-medium text-[#A3A3A3] mb-1">Modelo</h2>
-              <p className="text-2xl font-bold text-white">DeepSeek V4</p>
+              <p className="text-2xl font-bold text-white">{defaultModelName}</p>
             </div>
             <div className="bg-[#262626] rounded-2xl p-5 ring-1 ring-[#2F2F2F]">
               <h2 className="text-sm font-medium text-[#A3A3A3] mb-1">Versión</h2>

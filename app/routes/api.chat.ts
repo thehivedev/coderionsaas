@@ -2,8 +2,8 @@ import type { ActionFunctionArgs } from '@remix-run/node';
 import { createSupabaseServerClient, createSupabaseServiceClient } from '~/lib/supabaseServer';
 import type { ChatMessage } from '~/lib/types';
 
-const MODEL = 'deepseek/deepseek-v4-pro-0813';
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const DEFAULT_MODEL_ID = 'deepseek/deepseek-v4-pro-0813';
 
 export async function action({ request }: ActionFunctionArgs) {
   if (request.method !== 'POST') {
@@ -23,7 +23,7 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  let body: { chatId?: string; messages?: ChatMessage[] };
+  let body: { chatId?: string; messages?: ChatMessage[]; modelId?: string };
   try {
     body = await request.json();
   } catch {
@@ -33,7 +33,7 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  const { chatId, messages } = body;
+  const { chatId, messages, modelId } = body;
 
   if (!chatId || !messages || !Array.isArray(messages) || messages.length === 0) {
     return Response.json(
@@ -57,10 +57,10 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  // Fetch current token balance
+  // Fetch current token balance and preferred model
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('token_balance')
+    .select('token_balance, preferred_model_id')
     .eq('id', user.id)
     .maybeSingle();
 
@@ -72,6 +72,25 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const tokenBalance = profile.token_balance;
+
+  // Resolve which model to use: explicit modelId from request > user's preferred > default
+  const targetModelId = modelId || profile.preferred_model_id;
+
+  let apiModel = DEFAULT_MODEL_ID;
+  let tokenCostMultiplier = 1.0;
+
+  if (targetModelId) {
+    const { data: aiModel } = await supabase
+      .from('ai_models')
+      .select('model_id, token_cost_multiplier, is_active')
+      .eq('id', targetModelId)
+      .maybeSingle();
+
+    if (aiModel && aiModel.is_active) {
+      apiModel = aiModel.model_id;
+      tokenCostMultiplier = aiModel.token_cost_multiplier;
+    }
+  }
 
   // Estimate tokens: ~4 chars per token for input, 1.5x for output
   const lastMessage = messages[messages.length - 1];
@@ -93,6 +112,12 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
+  // Save the selected model on the chat
+  await supabase
+    .from('chats')
+    .update({ model: apiModel })
+    .eq('id', chatId);
+
   // Call OpenRouter server-side
   const apiKey = process.env.OPENROUTER_API_KEY;
   if (!apiKey) {
@@ -112,7 +137,7 @@ export async function action({ request }: ActionFunctionArgs) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: MODEL,
+        model: apiModel,
         messages: messages.map(({ role, content }) => ({ role, content })),
       }),
     });
@@ -139,7 +164,9 @@ export async function action({ request }: ActionFunctionArgs) {
   const actualInputTokens: number = data.usage?.prompt_tokens || estimatedInputTokens;
   const actualOutputTokens: number =
     data.usage?.completion_tokens || estimatedOutputTokens;
-  const actualTotalTokens = actualInputTokens + actualOutputTokens;
+  const actualTotalTokens = Math.ceil(
+    (actualInputTokens + actualOutputTokens) * tokenCostMultiplier
+  );
 
   // Deduct tokens via service role client (deduct_tokens is service-role only)
   const serviceClient = createSupabaseServiceClient();
@@ -193,6 +220,7 @@ export async function action({ request }: ActionFunctionArgs) {
       message: assistantMessage,
       tokenBalance: newBalance,
       tokensUsed: actualTotalTokens,
+      model: apiModel,
     },
     { headers }
   );
